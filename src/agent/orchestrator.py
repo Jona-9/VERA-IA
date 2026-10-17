@@ -44,7 +44,7 @@ from src.domain.entities import (
     SignalSet,
     Tone,
 )
-from src.mail.client import SMTPMailClient
+from src.mail.client import SMTPMailClient, build_mail_client
 from src.policy.config import PolicyConfig
 from src.policy.engine import (
     apply_hysteresis,
@@ -101,12 +101,12 @@ class NullDispatcher:
 
 
 class SmtpNoticeDispatcher:
-    """Despacha vía smtplib al servidor de captura local y confirma la recepción."""
+    """Despacha vía smtplib (captura local por defecto, SMTP real con VERAIA_MAIL_MODE=real)."""
 
     def __init__(self, repo: SQLitePortfolioRepository, client: Optional[SMTPMailClient] = None,
                  confirm_timeout: float = 2.0):
         self._repo = repo
-        self._client = client or SMTPMailClient()
+        self._client = client or build_mail_client()
         self._confirm_timeout = confirm_timeout
 
     def send(self, notice: Dict[str, Any], recipient: str) -> str:
@@ -117,6 +117,9 @@ class SmtpNoticeDispatcher:
             body_text=notice["body_text"],
             extra_headers={"X-VERAIA-Notice-Id": notice_id},
         )
+        if not self._client.settings.is_local:
+            # Envío real: no hay bandeja de captura que confirmar; el SMTP aceptó el mensaje.
+            return NoticeStatus.DISPATCHED.value
         deadline = time.monotonic() + self._confirm_timeout
         while time.monotonic() < deadline:
             if any(notice_id in e["raw_content"] for e in self._repo.get_captured_emails()):
@@ -501,7 +504,11 @@ class DailyCycleOrchestrator:
             if held_reason:
                 self._hold(notice, held_reason, report)
                 continue
-            status = dispatcher.send(notice, customer.email)
+            try:
+                status = dispatcher.send(notice, customer.email)
+            except Exception as exc:  # un fallo del proveedor no debe frenar el resto del despacho
+                self._hold(notice, f"FALLO DE ENVÍO: {type(exc).__name__}", report)
+                continue
             notice.update(status=status, sent_at=datetime.now())
             self.repo.save_notice(notice)
             report.sent.append(notice["notice_id"])

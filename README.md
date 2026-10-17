@@ -15,6 +15,15 @@ sale de este equipo.
 `seed=42`, entrena el modelo si falta y abre la interfaz. El servidor SMTP de captura arranca solo en
 `127.0.0.1:1025`.
 
+### Envío real de correos (opcional)
+
+Por defecto los avisos solo llegan a la bandeja de captura local. Para enviarlos de verdad por SMTP:
+copia `.env.example` a `.env`, completa host, usuario, clave y remitente, y corre `./demo.sh` (carga `.env`).
+Con `VERAIA_MAIL_REDIRECT_TO` todos los avisos van a esa dirección de prueba (el cliente original queda en el
+asunto y en la cabecera `X-VERAIA-Original-Recipient`). Escribir a los correos de la cartera exige
+`VERAIA_MAIL_ALLOW_REAL_RECIPIENTS=1`; sin ninguna de las dos variables, el arranque falla. Si el proveedor
+rechaza un aviso, ese aviso queda `REJECTED` con el motivo y el resto del despacho continúa.
+
 Otros comandos útiles:
 
 ```bash
