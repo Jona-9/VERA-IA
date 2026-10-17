@@ -1,0 +1,14 @@
+{#- Tono FIRM: solo post-vencimiento y bandas ALTA/CRITICA (lo garantiza ScheduleNoticeTool).
+    Firme pero respetuoso: sin amenazas, sin calificativos y sin mencionar clasificaciones internas. -#}
+{% set subject = "Cuota pendiente de pago - " ~ institution_name %}
+Estimado(a) {{ customer_name }}:
+
+Según nuestros registros, su cuota por {{ amount_due | money }} {{ due_phrase }} ({{ due_date_str }}) y aún no hemos recibido el pago correspondiente.
+
+Le solicitamos regularizar este saldo a la brevedad posible para mantener su cuenta al día. Si está atravesando alguna dificultad, comuníquese con nosotros respondiendo a este correo: queremos ayudarle a encontrar una alternativa de pago adecuada.
+
+Si ya realizó el pago en los últimos días, le pedimos disculpas por la molestia; es posible que aún se encuentre en proceso de acreditación.
+
+Atentamente,
+Equipo de Atención al Cliente
+{{ institution_name }}
