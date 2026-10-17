@@ -220,3 +220,16 @@ def test_llm_output_with_violation_is_replaced():
     message = compose_notice_message(make_context(), drafter=LLMMessageDrafter(client))
     assert message.validation_status == VALIDATION_FALLBACK
     assert "score" not in message.body_text.lower()
+
+
+@pytest.mark.parametrize("phrase", [
+    "Evite que tengamos que tomar medidas adicionales.",
+    "Sabemos donde trabaja actualmente.",
+    "Sus colegas se enteraran de este atraso si no responde.",
+    "No nos deje otra opcion.",
+    "Esto podria manchar su reputacion crediticia.",
+])
+def test_passive_aggressive_coercion_blocked(validator, phrase):
+    res = validator.validate("Aviso importante", phrase, days_to_due=3)
+    assert not res.passed
+    assert any(v.rule == ToneRule.STIGMATIZING_OR_COERCIVE for v in res.violations)

@@ -3,6 +3,7 @@ import type { ClientDossier, PortfolioClient } from '../types'
 import { api } from '../api'
 import { Tag, BandTag } from '../components/Tag'
 import { CaseRow } from '../components/CaseRow'
+import { AgentThoughtLog } from '../components/AgentThoughtLog'
 
 interface PortfolioViewProps {
   initialAccountId?: string
@@ -235,6 +236,17 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                 </div>
               )}
             </div>
+
+            {/* Razonamiento del Agente Constitucional */}
+            <AgentThoughtLog
+              trace={dossier.thought_trace}
+              accountId={dossier.account_id}
+              customerName={dossier.customer_name}
+              initialExpanded={true}
+              onTraceUpdated={(updated) => {
+                setDossier((prev) => (prev ? { ...prev, thought_trace: updated } : null))
+              }}
+            />
 
             {/* Probar límites de la herramienta */}
             <div className="card card-pad stack">

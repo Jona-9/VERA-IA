@@ -29,6 +29,7 @@ from src.agent.investigator import (
     InvestigationContext,
     build_investigator,
 )
+from src.agent.thought_trace import AgentThoughtTrace, build_thought_trace, synthesize_reasoning_with_llm
 from src.analytics.model import RiskModel
 from src.analytics.signals import compute_signals_for_account
 from src.data.repository import AccountDTO
@@ -141,6 +142,7 @@ class AccountDecision:
     notice_id: Optional[str] = None
     rejection_code: Optional[str] = None
     review_case_id: Optional[str] = None
+    thought_trace: Optional[Dict[str, Any]] = None
 
 
 @dataclass
@@ -244,23 +246,6 @@ class DailyCycleOrchestrator:
             "explanation": f"{hysteresis.explanation} {detail}".strip(),
         }
         self.repo.save_evaluation(evaluation)
-        self.repo.save_audit_log(create_audit_entry(
-            account_id=account.account_id,
-            event_type="EVALUATION",
-            actor="AGENT",
-            payload={
-                "cycle_date": cycle_date.isoformat(),
-                "signals": signals.model_dump(mode="json"),
-                "calibrated_probability": round(calibrated_p, 4),
-                "risk_band": band.value,
-                "hysteresis_rule": hysteresis.rule_applied,
-                "evidence_quality": evidence.value,
-                "action": action.value,
-                "rule_applied": rule,
-                "detail": detail,
-            },
-        ).model_dump())
-
         # El caso de revisión referencia la evaluación recién guardada (FK lógica).
         if extra.get("review_reason"):
             extra["review_case_id"] = self._open_review_case(
@@ -283,6 +268,53 @@ class DailyCycleOrchestrator:
                 evaluation.update(action_type=action, rule_applied=rule, explanation=f"{hysteresis.explanation} {detail}")
                 self.repo.save_evaluation(evaluation)
 
+        # Construir la traza de razonamiento ReAct del agente
+        target_day = None
+        if days_to_due > 0 and hasattr(self.selector, "choose"):
+            window = get_contact_window(band, True, self.policy)
+            if window.allowed and window.window_days_before_due:
+                target_day = self.selector.choose(account.account_id, band, window.window_days_before_due)
+
+        thought_trace = build_thought_trace(
+            account=account,
+            customer_name=customer_name,
+            history=history,
+            signals=signals,
+            band=band,
+            calibrated_p=calibrated_p,
+            hysteresis=hysteresis,
+            evidence=evidence,
+            days_to_due=days_to_due,
+            action=action,
+            rule=rule,
+            detail=detail,
+            pending=pending,
+            extra=extra,
+            target_day=target_day,
+            cycle_date=cycle_date.isoformat(),
+        )
+
+        trace_dict = thought_trace.to_dict()
+        evaluation["thought_trace"] = trace_dict
+
+        self.repo.save_audit_log(create_audit_entry(
+            account_id=account.account_id,
+            event_type="EVALUATION",
+            actor="AGENT",
+            payload={
+                "cycle_date": cycle_date.isoformat(),
+                "signals": signals.model_dump(mode="json"),
+                "calibrated_probability": round(calibrated_p, 4),
+                "risk_band": band.value,
+                "hysteresis_rule": hysteresis.rule_applied,
+                "evidence_quality": evidence.value,
+                "action": action.value,
+                "rule_applied": rule,
+                "detail": detail,
+                "thought_trace": trace_dict,
+            },
+        ).model_dump())
+
         return AccountDecision(
             evaluation=evaluation,
             action=action,
@@ -291,6 +323,7 @@ class DailyCycleOrchestrator:
             notice_id=extra.get("notice_id"),
             rejection_code=extra.get("rejection_code"),
             review_case_id=extra.get("review_case_id"),
+            thought_trace=trace_dict,
             **decision_kwargs,
         )
 

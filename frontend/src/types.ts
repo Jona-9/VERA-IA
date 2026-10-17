@@ -11,6 +11,27 @@ export interface SimulationStatus {
   smtp_ok: boolean
 }
 
+export interface ThoughtStep {
+  step: number
+  title: string
+  tool: string
+  detail: string
+  observation: string
+  status: 'SUCCESS' | 'BLOCKED' | 'INFO' | 'WARNING' | string
+  timestamp?: string
+}
+
+export interface AgentThoughtTrace {
+  account_id: string
+  customer_name: string
+  cycle_date: string
+  steps: ThoughtStep[]
+  final_verdict: string
+  constitutional_rule: string
+  llm_analysis?: string | null
+  used_llm?: boolean
+}
+
 export interface ReviewCase {
   case_id: string
   account_id: string
@@ -32,6 +53,7 @@ export interface ReviewCase {
   message_preview?: { subject: string; body_text: string } | null
   default_amount?: number
   default_date?: string
+  thought_trace?: AgentThoughtTrace | null
 }
 
 export interface TodayData {
@@ -50,6 +72,7 @@ export interface TodayData {
   early_signals: number
   reminders: number
   no_action: number
+  agent_trace?: AgentThoughtTrace | null
 }
 
 export interface NoticeItem {
@@ -165,6 +188,7 @@ export interface ClientDossier {
     actor: string
     payload: string
   }>
+  thought_trace?: AgentThoughtTrace | null
 }
 
 export interface BenchmarkData {

@@ -21,7 +21,11 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from src.agent.drafter import DeterministicMessageDrafter, DraftContext, compose_notice_message, format_due_date
-from src.domain.entities import NoticeStatus, PeriodRecord, RiskBand, Tone
+from src.agent.llm import LLMClient
+from src.agent.thought_trace import AgentThoughtTrace, ThoughtStep, build_thought_trace, synthesize_reasoning_with_llm
+from src.analytics.signals import compute_signals_for_account
+from src.domain.entities import Account, NoticeStatus, PeriodRecord, RiskBand, Tone
+from src.policy.engine import apply_hysteresis, assess_evidence_quality, get_contact_window
 from src.simulation.benchmark import run_benchmark
 from src.simulation.engine import PHASE_REVIEW
 from src.tools.schedule_tool import ScheduleNoticeInput
@@ -92,6 +96,65 @@ def _get_why_manual_approval(c: Dict[str, Any], account: Any, pending: List[Any]
         f"Requiere aprobación manual según política ({reason}). "
         f"{c.get('agent_hypothesis', '')}"
     ).strip()
+
+
+def _get_or_build_thought_trace(ctx: Any, account_id: str) -> Dict[str, Any]:
+    # 1. Buscar en registros de auditoría si ya existe
+    logs = ctx.repo.get_audit_logs(account_id, "EVALUATION")
+    if logs:
+        for l in logs:
+            p = l.get("payload")
+            if isinstance(p, str):
+                try:
+                    p = json.loads(p)
+                except Exception:
+                    p = {}
+            if isinstance(p, dict) and "thought_trace" in p and p["thought_trace"]:
+                return p["thought_trace"]
+
+    # 2. Generación al vuelo a partir del estado de la cartera
+    account = ctx.repo.get_account(account_id)
+    if not account:
+        return {}
+    customer = ctx.repo.get_customer(account.customer_id)
+    customer_name = customer.full_name if customer else account_id
+    history = [PeriodRecord(**h.model_dump()) for h in ctx.repo.get_period_history(account_id, ctx.engine.current_date)]
+    pending = ctx.repo.get_pending_payments(account_id, ctx.engine.current_date)
+    signals = compute_signals_for_account(Account(**account.model_dump()), history, ctx.engine.current_date)
+    raw_p, calibrated_p = ctx.model.evaluate_signals(signals)
+    previous_band, consecutive = ctx.orchestrator._band_history(account_id, calibrated_p, ctx.engine.current_date)
+    hysteresis = apply_hysteresis(calibrated_p, previous_band, consecutive, ctx.policy)
+    evidence = assess_evidence_quality(history, pending, ctx.engine.current_date, ctx.policy.evidence_rules)
+    band = hysteresis.confirmed_band
+    days_to_due = (account.due_date - ctx.engine.current_date).days
+    action, rule, detail, extra = ctx.orchestrator._decide(
+        account, customer, band, evidence, history, pending, ctx.engine.current_date, days_to_due
+    )
+    target_day = None
+    if days_to_due > 0 and hasattr(ctx.selector, "choose"):
+        window = get_contact_window(band, True, ctx.policy)
+        if window.allowed and window.window_days_before_due:
+            target_day = ctx.selector.choose(account.account_id, band, window.window_days_before_due)
+
+    trace = build_thought_trace(
+        account=account,
+        customer_name=customer_name,
+        history=history,
+        signals=signals,
+        band=band,
+        calibrated_p=calibrated_p,
+        hysteresis=hysteresis,
+        evidence=evidence,
+        days_to_due=days_to_due,
+        action=action,
+        rule=rule,
+        detail=detail,
+        pending=pending,
+        extra=extra,
+        target_day=target_day,
+        cycle_date=ctx.engine.current_date.isoformat(),
+    )
+    return trace.to_dict()
 
 
 def _enrich_case(ctx: Any, c: Dict[str, Any]) -> Dict[str, Any]:
@@ -185,6 +248,7 @@ def _enrich_case(ctx: Any, c: Dict[str, Any]) -> Dict[str, Any]:
         "facts": facts,
         "default_amount": default_amount,
         "default_date": default_date,
+        "thought_trace": _get_or_build_thought_trace(ctx, c["account_id"]),
     }
 
 
@@ -278,6 +342,11 @@ def get_today_data() -> Dict[str, Any]:
     reminders = counts["programados"] + counts["enviados"]
     no_action = int(((frame["Acción"] != "SCHEDULE_NOTICE") & ~frame["En revisión"]).sum()) if not frame.empty else 0
 
+    agent_trace = formatted_cases[0].get("thought_trace") if formatted_cases else None
+    if not agent_trace and not frame.empty:
+        first_acc = frame.iloc[0]["account_id"]
+        agent_trace = _get_or_build_thought_trace(ctx, first_acc)
+
     return {
         "headline": headline,
         "lead": lead,
@@ -290,6 +359,7 @@ def get_today_data() -> Dict[str, Any]:
         "early_signals": early,
         "reminders": reminders,
         "no_action": no_action,
+        "agent_trace": agent_trace,
     }
 
 
@@ -597,6 +667,7 @@ def get_client_dossier(account_id: str) -> Dict[str, Any]:
     ]
 
     prob_pct = f"{row['Probabilidad']:.0%}" if pd.notna(row["Probabilidad"]) else "—"
+    thought_trace = _get_or_build_thought_trace(ctx, account_id)
 
     return {
         "account_id": account_id,
@@ -623,6 +694,52 @@ def get_client_dossier(account_id: str) -> Dict[str, Any]:
         "history": history,
         "notices": notices,
         "audit": audit,
+        "thought_trace": thought_trace,
+    }
+
+
+@app.get("/api/portfolio/{account_id}/thought-trace")
+def get_client_thought_trace(account_id: str) -> Dict[str, Any]:
+    ctx = _get_ctx()
+    trace = _get_or_build_thought_trace(ctx, account_id)
+    if not trace:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+    return trace
+
+
+@app.post("/api/portfolio/{account_id}/llm-audit")
+def request_llm_audit(account_id: str) -> Dict[str, Any]:
+    ctx = _get_ctx()
+    trace_dict = _get_or_build_thought_trace(ctx, account_id)
+    if not trace_dict:
+        raise HTTPException(status_code=404, detail="Cuenta no encontrada")
+
+    steps = [
+        ThoughtStep(
+            step=s["step"],
+            title=s["title"],
+            tool=s["tool"],
+            detail=s.get("detail", ""),
+            observation=s.get("observation", ""),
+            status=s.get("status", "SUCCESS"),
+            timestamp=s.get("timestamp"),
+        )
+        for s in trace_dict.get("steps", [])
+    ]
+    trace = AgentThoughtTrace(
+        account_id=account_id,
+        customer_name=trace_dict.get("customer_name", account_id),
+        cycle_date=trace_dict.get("cycle_date", ctx.engine.current_date.isoformat()),
+        steps=steps,
+        final_verdict=trace_dict.get("final_verdict", ""),
+        constitutional_rule=trace_dict.get("constitutional_rule", ""),
+    )
+    analysis = synthesize_reasoning_with_llm(trace, client=LLMClient.from_env())
+    return {
+        "account_id": account_id,
+        "llm_analysis": analysis,
+        "used_llm": trace.used_llm,
+        "thought_trace": trace.to_dict(),
     }
 
 

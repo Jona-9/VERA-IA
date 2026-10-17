@@ -57,6 +57,12 @@ STIGMATIZING_OR_COERCIVE_PATTERNS: Tuple[str, ...] = (
     r"\bamenaza",
     r"\bincumplid[oa]\b",
     r"\birresponsable",
+    # Coerción indirecta y pasivo-agresiva (ToneGuard v2 - Plan de Acción 3.2)
+    r"\bevite\s+que\s+tengamos\s+que\b",
+    r"\bsabemos\s+donde\s+(trabaja|vive|labora)\b",
+    r"\b(colegas|jefe|empleador|familiares|vecinos)\s+(se\s+enteraran|sabran|contactaremos)\b",
+    r"\bno\s+nos\s+deje\s+otra\s+opcion\b",
+    r"\bmanchar?\s+su\s+reputacion\b",
 )
 
 PREVENTIVE_URGENCY_PATTERNS: Tuple[str, ...] = (

@@ -1,0 +1,39 @@
+{
+  "seed": 42,
+  "cutoff_date": "2026-10-15",
+  "horizon_days": 21,
+  "agent": {
+    "name": "Agente adaptativo",
+    "total_notices": 57,
+    "notices_low_moderate": 13,
+    "notices_while_payment_in_process": 0,
+    "paid_before_due": 22,
+    "paid_on_time": 38,
+    "paid_total": 56,
+    "avg_anticipation_days": 1.1578947368421053,
+    "accounts": 60,
+    "notices_by_band": {
+      "CRITICA": 44,
+      "BAJA": 13
+    },
+    "on_time_rate": 0.6333333333333333
+  },
+  "fixed": {
+    "name": "Campaña fija",
+    "total_notices": 84,
+    "notices_low_moderate": 28,
+    "notices_while_payment_in_process": 0,
+    "paid_before_due": 26,
+    "paid_on_time": 40,
+    "paid_total": 57,
+    "avg_anticipation_days": 1.225,
+    "accounts": 60,
+    "notices_by_band": {
+      "CRITICA": 56,
+      "BAJA": 27,
+      "MODERADA": 1
+    },
+    "on_time_rate": 0.6666666666666666
+  },
+  "low_moderate_reduction": 0.5357142857142857
+}

@@ -17,6 +17,7 @@ import pandas as pd
 import streamlit as st
 import yaml
 
+from src.agent.drafter import build_drafter
 from src.agent.orchestrator import DailyCycleOrchestrator, NoticeDispatcher, SmtpNoticeDispatcher
 from src.analytics.model import RiskModel
 from src.analytics.signals import compute_signals_for_account
@@ -89,7 +90,7 @@ def get_context() -> AppContext:
         smtp_ok = False  # puerto ocupado: la demo sigue, sin captura SMTP real
 
     selector = BanditSendDaySelector(policy, seed=SEED)
-    orchestrator = DailyCycleOrchestrator(repo, model, policy, selector=selector)
+    orchestrator = DailyCycleOrchestrator(repo, model, policy, selector=selector, drafter=build_drafter())
     dispatcher: NoticeDispatcher = SmtpNoticeDispatcher(repo)
     engine = SimulationEngine(
         repo, orchestrator, CustomerBehavior(seed=SEED), dispatcher, start_date=START_DATE,

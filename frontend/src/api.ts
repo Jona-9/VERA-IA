@@ -91,4 +91,15 @@ export const api = {
   runBenchmark: () => request<BenchmarkData>('/benchmark/run', { method: 'POST' }),
 
   getDashboard: () => request<import('./types').DashboardData>('/dashboard'),
+
+  getThoughtTrace: (accountId: string) =>
+    request<import('./types').AgentThoughtTrace>(`/portfolio/${accountId}/thought-trace`),
+
+  requestLlmAudit: (accountId: string) =>
+    request<{
+      account_id: string
+      llm_analysis: string
+      used_llm: boolean
+      thought_trace: import('./types').AgentThoughtTrace
+    }>(`/portfolio/${accountId}/llm-audit`, { method: 'POST' }),
 }
