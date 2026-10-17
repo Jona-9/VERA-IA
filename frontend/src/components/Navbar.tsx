@@ -11,21 +11,20 @@ interface NavbarProps {
 
 export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, status }) => {
   const tabs: Array<{ id: NavTab; label: string; badge?: number }> = [
-    { id: 'hoy', label: 'Hoy' },
+    { id: 'dashboard', label: 'Dashboard' },
     { id: 'por-revisar', label: 'Por revisar', badge: status?.review_count || 0 },
     { id: 'notificaciones', label: 'Notificaciones' },
     { id: 'clientes', label: 'Clientes' },
-    { id: 'dashboard', label: 'Dashboard' },
   ]
 
   return (
     <header className="vh-header">
       <div className="nav">
         <a
-          href="#hoy"
+          href="#dashboard"
           onClick={(e) => {
             e.preventDefault()
-            onSelectTab('hoy')
+            onSelectTab('dashboard')
           }}
           className="brand"
         >

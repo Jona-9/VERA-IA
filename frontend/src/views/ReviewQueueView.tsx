@@ -18,12 +18,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
   const [submitting, setSubmitting] = useState(false)
   const [notification, setNotification] = useState<string | null>(null)
 
-  // Form states
-  const [confirmedPayment, setConfirmedPayment] = useState<boolean>(true)
-  const [amount, setAmount] = useState<number>(0)
-  const [paymentDate, setPaymentDate] = useState<string>('')
-  const [analyst, setAnalyst] = useState<string>('analista@demo.veraia.local')
-  const [notes, setNotes] = useState<string>('')
+  const analyst = 'analista@demo.veraia.local'
 
   const loadQueue = async (preserveSelectedId?: string) => {
     try {
@@ -34,7 +29,6 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
           ? preserveSelectedId
           : res[0].case_id
         setSelectedCaseId(nextSelected)
-        initFormForCase(res.find((c) => c.case_id === nextSelected))
       } else {
         setSelectedCaseId(null)
       }
@@ -45,14 +39,6 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
     }
   }
 
-  const initFormForCase = (c?: ReviewCase) => {
-    if (!c) return
-    setConfirmedPayment(true)
-    setAmount(c.default_amount ?? 0)
-    setPaymentDate(c.default_date ?? new Date().toISOString().split('T')[0])
-    setNotes('')
-  }
-
   useEffect(() => {
     loadQueue(initialCaseId)
   }, [initialCaseId])
@@ -61,7 +47,6 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
 
   const handleSelectCase = (c: ReviewCase) => {
     setSelectedCaseId(c.case_id)
-    initFormForCase(c)
   }
 
   const handleReevaluate = async (e: React.FormEvent) => {
@@ -71,11 +56,8 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
     try {
       setSubmitting(true)
       const res = await api.reevaluateCase(selectedCase.case_id, {
-        confirmed: confirmedPayment,
-        amount: confirmedPayment ? Number(amount) : undefined,
-        payment_date: confirmedPayment ? paymentDate : undefined,
+        confirmed: false,
         analyst,
-        notes,
       })
       setNotification(`Caso resuelto. ${res.summary}`)
       onCaseResolved()
@@ -96,7 +78,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
       <section className="hero">
         <h1>Por revisar</h1>
         <p className="muted">
-          Casos que el agente no resuelve solo. Corrige el dato y reevalúa al instante.
+          Casos que el agente no resuelve solo. Revisa el mensaje que se enviará y apruébalo.
         </p>
       </section>
 
@@ -208,99 +190,26 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                 )}
               </div>
 
-              {/* Form */}
+              {/* Mensaje que se enviará */}
               <form onSubmit={handleReevaluate} className="card card-pad stack">
-                <h3 className="section-title text-base font-semibold">Corregir y reevaluar</h3>
+                <h3 className="section-title text-base font-semibold">Mensaje que se enviará</h3>
 
-                <div className="flex flex-col gap-2">
-                  <label className="text-sm font-medium">¿Se recibió el pago?</label>
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input
-                        type="radio"
-                        name="payment_confirmed"
-                        checked={confirmedPayment === true}
-                        onChange={() => setConfirmedPayment(true)}
-                        className="accent-[#1F3FBF]"
-                      />
-                      <span>Sí, confirmar el pago</span>
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer text-sm">
-                      <input
-                        type="radio"
-                        name="payment_confirmed"
-                        checked={confirmedPayment === false}
-                        onChange={() => setConfirmedPayment(false)}
-                        className="accent-[#1F3FBF]"
-                      />
-                      <span>No hay pago, seguir con la política</span>
-                    </label>
-                  </div>
-                </div>
-
-                {confirmedPayment && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
-                        Monto pagado
-                      </label>
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={amount}
-                        onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-                        className="form-input"
-                        required
-                      />
+                {selectedCase.message_preview ? (
+                  <div className="p-4 bg-[#FAFAF8] border border-[#ECECE8] rounded-xl flex flex-col gap-2">
+                    <div className="text-sm font-semibold text-[var(--ink)]">
+                      Asunto: {selectedCase.message_preview.subject}
                     </div>
-                    <div>
-                      <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
-                        Fecha del pago
-                      </label>
-                      <input
-                        type="date"
-                        value={paymentDate}
-                        onChange={(e) => setPaymentDate(e.target.value)}
-                        className="form-input"
-                        required
-                      />
-                    </div>
+                    <p className="text-sm text-[var(--ink)] whitespace-pre-line leading-relaxed">
+                      {selectedCase.message_preview.body_text}
+                    </p>
                   </div>
+                ) : (
+                  <p className="muted">No hay plantilla disponible para este caso.</p>
                 )}
 
                 <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
-                    Analista
-                  </label>
-                  <input
-                    type="text"
-                    value={analyst}
-                    onChange={(e) => setAnalyst(e.target.value)}
-                    className="form-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-semibold text-[var(--muted)] mb-1">
-                    Notas
-                  </label>
-                  <textarea
-                    rows={2}
-                    value={notes}
-                    onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Opcional. Queda en la bitácora de auditoría."
-                    className="form-textarea"
-                  />
-                </div>
-
-                <div>
-                  <button
-                    type="submit"
-                    className="btn btn-primary"
-                    disabled={submitting}
-                  >
-                    {submitting ? 'Reevaluando…' : 'Reevaluar'}
+                  <button type="submit" className="btn btn-primary" disabled={submitting}>
+                    {submitting ? 'Enviando…' : 'Aprobar y enviar'}
                   </button>
                 </div>
               </form>

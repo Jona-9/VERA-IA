@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react'
 import type { DashboardData } from '../types'
 import { api } from '../api'
 import { Tile } from '../components/Tile'
-import { Tag, BandTag } from '../components/Tag'
+import { Tag } from '../components/Tag'
 
 const AGENT_COLOR = '#1F3FBF'
 const FIXED_COLOR = '#9AA0AA'
@@ -52,6 +52,79 @@ const BarGroup: React.FC<BarGroupProps> = ({ label, agentVal, fixedVal, maxVal }
             />
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+const PASTEL = ['#A8C5F0', '#F6C1B2', '#B9E3C6', '#F3DFA2', '#D3C0F0', '#F2B8D0']
+
+interface ChartItem {
+  label: string
+  value: number
+  color?: string
+}
+
+interface BarChartProps {
+  title: string
+  bars: ChartItem[]
+}
+
+const PieChart: React.FC<BarChartProps> = ({ title, bars }) => {
+  const total = bars.reduce((a, b) => a + b.value, 0)
+  let acc = 0
+  const stops = bars.map((b, i) => {
+    const start = (acc / Math.max(total, 1)) * 100
+    acc += b.value
+    return `${b.color ?? PASTEL[i % PASTEL.length]} ${start}% ${(acc / Math.max(total, 1)) * 100}%`
+  })
+  return (
+    <div className="flex flex-col gap-3 border border-[var(--muted)] rounded-2xl p-4">
+      <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
+      <div className="flex items-center gap-6 h-44">
+        <div
+          className="w-36 h-36 rounded-full shrink-0"
+          style={{ background: total ? `conic-gradient(${stops.join(', ')})` : '#F0F0EC' }}
+        />
+        <ul className="flex flex-col gap-1.5 text-xs">
+          {bars.map((b, i) => (
+            <li key={b.label} className="flex items-center gap-2 text-[var(--ink)]">
+              <span className="w-3 h-3 rounded-full" style={{ backgroundColor: b.color ?? PASTEL[i % PASTEL.length] }} />
+              <span>{b.label}</span>
+              <span className="font-bold">
+                {b.value}
+                {total ? ` (${Math.round((b.value / total) * 100)}%)` : ''}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
+  )
+}
+
+const BarChart: React.FC<BarChartProps> = ({ title, bars }) => {
+  const max = Math.max(...bars.map((b) => b.value), 1)
+  return (
+    <div className="flex flex-col gap-3 border border-[var(--muted)] rounded-2xl p-4">
+      <h3 className="text-sm font-semibold text-[var(--ink)]">{title}</h3>
+      <div className="flex items-end gap-3 h-44 border-b border-[#ECECE8]">
+        {bars.map((b, i) => (
+          <div key={b.label} className="flex-1 h-full flex flex-col justify-end items-center gap-1">
+            <span className="text-xs font-bold text-[var(--ink)]">{b.value}</span>
+            <div
+              className="w-full max-w-[56px] rounded-t-lg transition-all duration-500"
+              style={{ height: `${(b.value / max) * 85}%`, minHeight: b.value ? 4 : 0, backgroundColor: b.color ?? PASTEL[i % PASTEL.length] }}
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex gap-3">
+        {bars.map((b) => (
+          <span key={b.label} className="flex-1 text-center text-[11px] text-[var(--muted)] leading-tight">
+            {b.label}
+          </span>
+        ))}
       </div>
     </div>
   )
@@ -116,6 +189,25 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToReview
 
   const bData = benchmark?.data
 
+  const countBy = (keyOf: (c: (typeof pending_cases)[number]) => string, order: string[]) =>
+    order.map((label) => ({ label, value: pending_cases.filter((c) => keyOf(c) === label).length }))
+  const dueBars = countBy(
+    (c) => (c.days_to_due <= 0 ? 'Vencido / hoy' : c.days_to_due <= 2 ? '1–2 días' : c.days_to_due <= 4 ? '3–4 días' : '5+ días'),
+    ['Vencido / hoy', '1–2 días', '3–4 días', '5+ días']
+  ).map((b, i) => ({ ...b, color: ['#F6B7B0', '#F7D3A6', '#F3E7A4', '#B9E3C6'][i] }))
+  const riskBars = countBy(
+    (c) => ({ BAJA: 'Bajo', MODERADA: 'Moderado', ALTA: 'Alto' } as Record<string, string>)[c.risk_band ?? ''] ?? 'Sin evaluar',
+    ['Bajo', 'Moderado', 'Alto', 'Sin evaluar']
+  ).map((b, i) => ({ ...b, color: ['#B9E3C6', '#F3E7A4', '#F6B7B0', '#D9DCE3'][i] }))
+  const portfolioPie: ChartItem[] = [
+    { label: 'Resueltas por IA', value: resolved_by_ai, color: '#A8C5F0' },
+    { label: 'En revisión', value: human_review_required, color: '#F6C1B2' },
+  ]
+  const queuePie: ChartItem[] = [
+    { label: 'Pendientes de hoy', value: cases_status.pending_today, color: '#D3C0F0' },
+    { label: 'Arrastrados', value: cases_status.pending_carryover, color: '#F2B8D0' },
+  ]
+
   return (
     <main className="page gap-8">
       <section className="hero">
@@ -156,7 +248,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToReview
         </div>
       </section>
 
-      {/* Casos pendientes no revisados */}
+      {/* Casos pendientes no revisados: gráficos de barras */}
       <section className="card card-pad stack">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#ECECE8] pb-3">
           <div>
@@ -181,42 +273,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({ onNavigateToReview
         {pending_cases.length === 0 ? (
           <p className="text-sm text-[var(--muted)] py-4">No hay casos pendientes de revisión.</p>
         ) : (
-          <div className="divide-y divide-[#EFEFEB]">
-            {pending_cases.map((c) => (
-              <div
-                key={c.case_id}
-                role="button"
-                tabIndex={0}
-                onClick={() => onNavigateToReview(c.case_id)}
-                onKeyDown={(e) => e.key === 'Enter' && onNavigateToReview(c.case_id)}
-                className="py-3.5 flex flex-col gap-1.5 hover:bg-[#F7F7F4] rounded-lg px-2 -mx-2 transition-colors cursor-pointer"
-              >
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-sm text-[var(--ink)]">{c.customer_name}</span>
-                    <span className="text-xs text-[var(--muted)]">({c.account_id})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Tag
-                      text={c.status_label || (c.is_carryover ? 'Arrastrado de ayer' : 'Pendiente hoy')}
-                      css={c.status_css || (c.is_carryover ? 't-urgent' : 't-soon')}
-                    />
-                    <Tag text={c.when_text} css={c.is_urgent ? 't-urgent' : 't-soon'} />
-                    <BandTag band={c.risk_band} />
-                  </div>
-                </div>
-
-                {c.customer_context && (
-                  <div className="text-xs text-[var(--muted)]">{c.customer_context}</div>
-                )}
-
-                {c.why_manual_approval && (
-                  <div className="text-xs text-[#7A2E06] bg-[#FDF5E6] p-2 rounded-md border border-[#FBE6C6]">
-                    <strong>Por qué debe ser aprobado manualmente:</strong> {c.why_manual_approval}
-                  </div>
-                )}
-              </div>
-            ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-2">
+            <BarChart title="Por vencimiento" bars={dueBars} />
+            <BarChart title="Por nivel de riesgo" bars={riskBars} />
+            <PieChart title="Cartera: IA vs. revisión humana" bars={portfolioPie} />
+            <PieChart title="Cola: hoy vs. arrastrados" bars={queuePie} />
           </div>
         )}
       </section>

@@ -29,6 +29,7 @@ export interface ReviewCase {
   is_carryover?: boolean
   opened_date?: string
   facts?: Array<{ k: string; v: string }>
+  message_preview?: { subject: string; body_text: string } | null
   default_amount?: number
   default_date?: string
 }
