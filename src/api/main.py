@@ -50,49 +50,6 @@ def _body(raw: str) -> str:
     return part.get_content() if part is not None else raw
 
 
-# ---------------------------------------------------------------------------
-# Status & Simulation Controls
-# ---------------------------------------------------------------------------
-
-@app.get("/api/status")
-def get_status() -> Dict[str, Any]:
-    ctx = _get_ctx()
-    engine = ctx.engine
-    in_review = engine.phase == PHASE_REVIEW
-    review_queue = ctx.repo.get_review_queue()
-    header_note = f"{theme.day_label(engine.current_date)} · " + (
-        "revisión hasta las 09:00" if in_review else "avisos enviados a las 10:00"
-    )
-    return {
-        "day_number": engine.day_number,
-        "current_date": engine.current_date.isoformat(),
-        "date_label": theme.day_label(engine.current_date),
-        "phase": engine.phase,
-        "in_review": in_review,
-        "header_note": header_note,
-        "review_count": len(review_queue),
-        "smtp_ok": ctx.smtp_ok,
-    }
-
-
-@app.post("/api/simulation/close-day")
-def close_day() -> Dict[str, Any]:
-    ctx = _get_ctx()
-    ctx.engine.close_day()
-    return get_status()
-
-
-@app.post("/api/simulation/advance-day")
-def advance_day() -> Dict[str, Any]:
-    ctx = _get_ctx()
-    ctx.engine.advance_day()
-    return get_status()
-
-
-@app.post("/api/simulation/reset")
-def reset_demo() -> Dict[str, Any]:
-    services.reset_demo()
-    return get_status()
 
 
 # ---------------------------------------------------------------------------
