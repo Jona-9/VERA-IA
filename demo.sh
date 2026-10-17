@@ -15,6 +15,10 @@ pick_python() {
   exit 1
 }
 
+if [ -f .env ]; then
+  set -a; . ./.env; set +a   # credenciales SMTP del envío real (ver .env.example)
+fi
+
 if [ ! -d .venv ]; then
   "$(pick_python)" -m venv .venv
 fi
