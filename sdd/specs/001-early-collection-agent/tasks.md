@@ -23,10 +23,10 @@
 
 **Purpose**: Inicialización del proyecto, contratos base de configuración y repositorio desacoplado.
 
-- [ ] T001 Crear estructura del proyecto y configuración base en `config/politica.yaml`, `config/config.yaml` y `requirements.txt`
-- [ ] T002 Implementar la interfaz de repositorio abstracto en `src/data/repository.py` y su implementación SQLite en `src/data/sqlite_repo.py` (RF-02)
-- [ ] T003 Implementar el generador dummy con semilla fija y patrones de clientes (estables, deterioro, crónicos, pagos demorados) en `src/data/generator.py` y `src/cli/generate_data.py` (RF-01)
-- [ ] T004 [P] Implementar pruebas automatizadas de reproducibilidad e integridad del generador en `tests/unit/test_generator.py`
+- [x] T001 Crear estructura del proyecto y configuración base en `config/politica.yaml`, `config/config.yaml` y `requirements.txt`
+- [x] T002 Implementar la interfaz de repositorio abstracto en `src/data/repository.py` y su implementación SQLite en `src/data/sqlite_repo.py` (RF-02)
+- [x] T003 Implementar el generador dummy con semilla fija y patrones de clientes (estables, deterioro, crónicos, pagos demorados) en `src/data/generator.py` y `src/cli/generate_data.py` (RF-01)
+- [x] T004 [P] Implementar pruebas automatizadas de reproducibilidad e integridad del generador en `tests/unit/test_generator.py`
 
 ---
 
