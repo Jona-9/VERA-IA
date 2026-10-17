@@ -39,6 +39,9 @@ data/*.csv
 !data/.gitkeep
 !reports/.gitkeep
 
+# Secrets
+.env
+
 # macOS
 .DS_Store
 
