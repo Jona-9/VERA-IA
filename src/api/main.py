@@ -7,6 +7,7 @@ para el frontend en React + Vite + TypeScript.
 from __future__ import annotations
 
 import json
+import logging
 from datetime import date
 from email import message_from_string, policy
 from pathlib import Path
@@ -19,6 +20,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
+from src.agent.drafter import DeterministicMessageDrafter, DraftContext, compose_notice_message, format_due_date
 from src.domain.entities import NoticeStatus, PeriodRecord, RiskBand, Tone
 from src.simulation.benchmark import run_benchmark
 from src.simulation.engine import PHASE_REVIEW
@@ -142,10 +144,31 @@ def _enrich_case(ctx: Any, c: Dict[str, Any]) -> Dict[str, Any]:
         {"k": "Avisos enviados", "v": str(len(notices))},
     ]
 
+    message_preview = None
+    if account:
+        try:
+            days = (account.due_date - ctx.engine.current_date).days
+            msg = compose_notice_message(
+                DraftContext(
+                    client_reference=account.account_id,
+                    tone=Tone.PREVENTIVE if days > 0 else Tone.FIRM,
+                    days_to_due=days,
+                    amount_due=account.minimum_payment,
+                    due_date_str=format_due_date(account.due_date),
+                ),
+                customer_name=customer_name,
+                drafter=DeterministicMessageDrafter(),
+            )
+            message_preview = {"subject": msg.subject, "body_text": msg.body_text}
+        except Exception:
+            logging.getLogger(__name__).exception("No se pudo generar la plantilla del caso %s", c["case_id"])
+            message_preview = None
+
     return {
         "case_id": c["case_id"],
         "account_id": c["account_id"],
         "customer_name": customer_name,
+        "message_preview": message_preview,
         "days_to_due": c["days_to_due"],
         "when_text": theme.when_text(c["days_to_due"]),
         "is_urgent": theme.is_urgent(c["days_to_due"]) or is_carryover,

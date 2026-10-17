@@ -12,7 +12,7 @@ import { PortfolioView } from './views/PortfolioView'
 import { DashboardView } from './views/DashboardView'
 
 export function App() {
-  const [currentTab, setCurrentTab] = useState<NavTab>('hoy')
+  const [currentTab, setCurrentTab] = useState<NavTab>('dashboard')
   const [status, setStatus] = useState<SimulationStatus | null>(null)
 
   // Navigation cross-linking states
