@@ -275,7 +275,7 @@ class DailyCycleOrchestrator:
                 detail = f"La herramienta rechazó el aviso ({rejection})."
             elif notice_id:
                 action, rule = ActionType.SCHEDULE_NOTICE, "NOTICE_APPROVED"
-                detail = f"Aviso {extra['schedule']['tone'].value} aprobado para las 10:00."
+                detail = f"Aviso {extra['schedule']['tone'].value} aprobado para envío."
             if rejection or notice_id:
                 evaluation.update(action_type=action, rule_applied=rule, explanation=f"{hysteresis.explanation} {detail}")
                 self.repo.save_evaluation(evaluation)
@@ -493,7 +493,7 @@ class DailyCycleOrchestrator:
             customer = self.repo.get_customer(account.customer_id) if account else None
             held_reason = None
             if notice["account_id"] in pending_accounts:
-                held_reason = "RETENIDO: caso sin revisar al cierre de las 09:00"
+                held_reason = "RETENIDO: caso sin revisar hoy"
             elif account is None or account.status == "PAID" or account.current_balance <= 0:
                 held_reason = "CANCELADO: el cliente ya pagó"
             elif customer is None or not customer.contact_enabled:

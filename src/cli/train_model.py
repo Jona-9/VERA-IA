@@ -148,7 +148,14 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Entrenamiento y calibración del modelo de riesgo VERAIA.")
     parser.add_argument("--db", type=str, default="data/portfolio_demo.db", help="Ruta a base SQLite.")
     parser.add_argument("--cutoff-date", type=str, default="2026-10-15", help="Fecha de corte YYYY-MM-DD.")
-    parser.add_argument("--output-report", type=str, default="reports/model_evaluation.json", help="Salida reporte.")
+    parser.add_argument(
+        "--output-report",
+        "--output-metrics",
+        dest="output_report",
+        type=str,
+        default="reports/model_evaluation.json",
+        help="Salida reporte de métricas.",
+    )
     parser.add_argument("--output-model", type=str, default="reports/risk_model.joblib", help="Salida modelo.")
     parser.add_argument("--random-state", type=int, default=42, help="Semilla para reproducibilidad.")
     args = parser.parse_args()
@@ -167,6 +174,14 @@ def main() -> None:
         try:
             X, y = load_from_sqlite(args.db, cutoff_d)
             print(f"[+] Datos extraídos exitosamente: {len(X)} registros observados.")
+            counts = y.value_counts()
+            if len(counts) < 2 or counts.min() < 6:
+                print(
+                    f"[!] La base de datos actual contiene clases desbalanceadas o insuficientes "
+                    f"a fecha de corte ({dict(counts)}) para CV estratificado (cv=3).\n"
+                    f"[*] Generando conjunto histórico calibrado sintético (300 muestras)..."
+                )
+                X, y = generate_synthetic_dataset(n_samples=300, random_state=args.random_state)
         except Exception as e:
             print(f"[!] Advertencia al leer SQLite ({e}). Generando conjunto sintético...")
             X, y = generate_synthetic_dataset(n_samples=300, random_state=args.random_state)

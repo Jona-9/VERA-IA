@@ -15,7 +15,7 @@
       "empirical_fraction_positives": 0.0
     },
     {
-      "predicted_probability": 0.5058657764927541,
+      "predicted_probability": 0.505865776492754,
       "empirical_fraction_positives": 0.4
     },
     {
@@ -33,7 +33,7 @@
     "all_thresholds_satisfied": true
   },
   "training_metadata": {
-    "execution_timestamp": "2026-10-17T14:56:56.024639",
+    "execution_timestamp": "2026-10-17T15:27:08.020230",
     "cutoff_date": "2026-10-15",
     "random_state": 42,
     "features": [

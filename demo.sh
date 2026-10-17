@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Levanta VERAIA con un solo comando: entorno, datos, modelo e interfaz (Streamlit + SMTP local).
+# Levanta VERAIA con un solo comando: entorno, datos, modelo, backend FastAPI e interfaz React + Vite + TypeScript.
 # Uso: ./demo.sh            (puerto 8501)    PORT=8600 ./demo.sh
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -27,5 +27,10 @@ if [ ! -f reports/risk_model.joblib ]; then
   .venv/bin/python -m src.cli.train_model --db data/portfolio_demo.db
 fi
 
+if [ ! -d frontend/dist ]; then
+  echo "Compilando frontend en React + Vite + TypeScript..."
+  (cd frontend && npm install && npm run build)
+fi
+
 echo "VERAIA lista. Abre http://localhost:${PORT:-8501}  (los correos quedan en la bandeja local 127.0.0.1:1025)"
-exec .venv/bin/streamlit run src/ui/app.py --server.port "${PORT:-8501}"
+exec .venv/bin/uvicorn src.api.main:app --host 0.0.0.0 --port "${PORT:-8501}"

@@ -1,0 +1,376 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --ink: #111318;
+  --muted: #5F646D;
+  --accent: #1F3FBF;
+  --accent-dark: #16309A;
+  --line: #E8E8E3;
+}
+
+html, body {
+  font-family: 'Geist', ui-sans-serif, system-ui, -apple-system, sans-serif;
+  background-color: #FAFAF8;
+  color: var(--ink);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Card & Layout */
+.app-container {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px 56px;
+}
+
+.vh-header {
+  background: #ffffff;
+  border-bottom: 1px solid #ECECE8;
+  width: 100%;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.nav {
+  max-width: 1120px;
+  margin: 0 auto;
+  padding: 0 24px;
+  min-height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 600;
+  color: #111318;
+  text-decoration: none;
+}
+
+.links {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.lnk {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 999px;
+  color: #4B5058;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: none;
+  background: transparent;
+  font-size: 15px;
+}
+
+.lnk:hover {
+  background: #F0F0EC;
+  color: #111318;
+}
+
+.lnk-on, .lnk-on:hover {
+  background: #111318;
+  color: #ffffff;
+}
+
+.badge {
+  font-size: 12px;
+  font-weight: 600;
+  background: #1F3FBF;
+  color: #ffffff;
+  border-radius: 999px;
+  padding: 0 7px;
+  line-height: 20px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.small {
+  font-size: 13px;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 40px;
+  padding-top: 40px;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.hero h1 {
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  margin: 0;
+  color: var(--ink);
+}
+
+.hero p {
+  font-size: 17px;
+  margin: 0;
+  color: var(--muted);
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 0 22px;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 15px;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid #D9DADF;
+  background: #ffffff;
+  color: #111318;
+}
+
+.btn:hover {
+  border-color: #111318;
+}
+
+.btn-primary {
+  background: #1F3FBF;
+  color: #ffffff;
+  border: 1px solid transparent;
+}
+
+.btn-primary:hover {
+  background: #16309A;
+  color: #ffffff;
+}
+
+.btn-primary:disabled, .btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.card {
+  background: #ffffff;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+}
+
+.card-pad {
+  padding: 22px;
+}
+
+.case {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 16px;
+  align-items: center;
+  padding: 16px 20px;
+  color: #111318;
+  text-decoration: none;
+  border-top: 1px solid #EFEFEB;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+
+.case:first-child {
+  border-top: 0;
+}
+
+.case:hover {
+  background: #F7F7F4;
+}
+
+.case-on {
+  background: #F3F5FD !important;
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  font-size: 12.5px;
+  font-weight: 500;
+  border-radius: 999px;
+  padding: 3px 10px;
+  white-space: nowrap;
+}
+
+.t-urgent {
+  background: #FCE7DA;
+  color: #7A2E06;
+}
+
+.t-soon {
+  background: #F1F1ED;
+  color: #3E434B;
+}
+
+.t-ok {
+  background: #E2F2E6;
+  color: #1D5B32;
+}
+
+.t-info {
+  background: #E6EBFA;
+  color: #1F3FBF;
+}
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr));
+  gap: 16px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 22px;
+  color: #111318;
+  text-decoration: none;
+  transition: border-color 0.15s ease;
+}
+
+.tile:hover {
+  border-color: #C9CBD1;
+}
+
+.num {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.link-s {
+  color: #1F3FBF;
+  font-weight: 500;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: none;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+.link-s:hover {
+  color: #16309A;
+  text-decoration: underline;
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.kv {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 16px;
+}
+
+.kv .k {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+
+.kv .v {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.mail-body {
+  white-space: pre-wrap;
+  font-size: 14.5px;
+  line-height: 1.6;
+  color: var(--ink);
+}
+
+.vh-footer {
+  border-top: 1px solid #ECECE8;
+  margin-top: 56px;
+  padding: 20px 0;
+  text-align: center;
+}
+
+/* Custom form elements */
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  border-radius: 12px;
+  border: 1px solid #D9DADF;
+  background: #ffffff;
+  padding: 10px 14px;
+  font-size: 14.5px;
+  font-family: inherit;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  border-color: #1F3FBF;
+  box-shadow: 0 0 0 2px rgba(31, 63, 191, 0.15);
+}
+
+/* Tables */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.data-table th {
+  text-align: left;
+  padding: 10px 14px;
+  font-weight: 600;
+  color: var(--muted);
+  border-bottom: 1px solid var(--line);
+  background: #FBFBFA;
+}
+
+.data-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #F0F0EC;
+  color: var(--ink);
+}
+
+.data-table tr:last-child td {
+  border-bottom: none;
+}
