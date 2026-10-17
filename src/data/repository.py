@@ -4,7 +4,7 @@ Cumple con la especificación sdd/specs/001-early-collection-agent/contracts/rep
 """
 
 from datetime import date
-from typing import Protocol, List, Optional, Dict, Any
+from typing import Protocol, List, Optional, Dict, Any, runtime_checkable
 from pydantic import BaseModel
 
 
@@ -13,6 +13,7 @@ class CustomerDTO(BaseModel):
     full_name: str
     email: str
     contact_enabled: bool
+    created_at: Optional[date] = None
 
 
 class AccountDTO(BaseModel):
@@ -47,6 +48,7 @@ class PendingPaymentDTO(BaseModel):
     status: str  # 'IN_PROCESS', 'CLEARED', 'REJECTED'
 
 
+@runtime_checkable
 class PortfolioRepository(Protocol):
     """
     Protocolo abstracto para el acceso a datos de cartera y gestión de eventos.

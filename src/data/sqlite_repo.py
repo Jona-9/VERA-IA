@@ -19,6 +19,28 @@ from src.data.repository import (
 )
 
 
+def _to_dict(obj: Any) -> Dict[str, Any]:
+    if hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    if hasattr(obj, "dict"):
+        return obj.dict()
+    if isinstance(obj, dict):
+        return obj
+    raise TypeError(f"No se puede convertir el objeto {type(obj)} a diccionario.")
+
+
+def _str_val(v: Any) -> Optional[str]:
+    """Extrae el valor en string limpio, manejando Enums de Python 3.9+ y cadenas directas."""
+    if v is None:
+        return None
+    if hasattr(v, "value"):
+        return str(v.value)
+    s = str(v)
+    if "." in s and any(prefix in s for prefix in ("RiskBand.", "Tone.", "NoticeStatus.", "AccountStatus.", "EvidenceQuality.", "ActionType.")):
+        return s.split(".")[-1]
+    return s
+
+
 def _parse_date(val: Any) -> Optional[date]:
     if val is None:
         return None
@@ -247,7 +269,6 @@ class SQLitePortfolioRepository(PortfolioRepository):
 
     def get_portfolio_accounts(self, cutoff_date: date) -> List[AccountDTO]:
         """Obtiene todas las cuentas activas a ser evaluadas a la fecha de corte."""
-        cutoff_str = _format_date(cutoff_date)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -279,7 +300,7 @@ class SQLitePortfolioRepository(PortfolioRepository):
             cursor = conn.cursor()
             cursor.execute(
                 """
-                SELECT customer_id, full_name, email, contact_enabled
+                SELECT customer_id, full_name, email, contact_enabled, created_at
                 FROM customers
                 WHERE customer_id = ?;
                 """,
@@ -293,6 +314,7 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 full_name=row["full_name"],
                 email=row["email"],
                 contact_enabled=bool(row["contact_enabled"]),
+                created_at=_parse_date(row["created_at"]),
             )
 
     def get_period_history(self, account_id: str, cutoff_date: date) -> List[PeriodRecordDTO]:
@@ -377,8 +399,9 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 for r in rows
             ]
 
-    def save_evaluation(self, evaluation: Dict[str, Any]) -> None:
+    def save_evaluation(self, evaluation: Union[Dict[str, Any], Any]) -> None:
         """Persiste la evaluación y decisión analítica del agente."""
+        ev = _to_dict(evaluation)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -391,19 +414,19 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    evaluation["evaluation_id"],
-                    evaluation["account_id"],
-                    _format_date(evaluation["evaluation_date"]),
-                    float(evaluation["raw_probability"]),
-                    float(evaluation["calibrated_probability"]),
-                    str(evaluation["risk_band"]),
-                    str(evaluation.get("previous_risk_band")) if evaluation.get("previous_risk_band") else None,
-                    1 if evaluation.get("band_change_confirmed") else 0,
-                    str(evaluation["evidence_quality"]),
-                    str(evaluation["action_type"]),
-                    str(evaluation["rule_applied"]),
-                    str(evaluation["explanation"]),
-                    _format_datetime(evaluation.get("created_at")),
+                    ev["evaluation_id"],
+                    ev["account_id"],
+                    _format_date(ev["evaluation_date"]),
+                    float(ev["raw_probability"]),
+                    float(ev["calibrated_probability"]),
+                    _str_val(ev["risk_band"]),
+                    _str_val(ev.get("previous_risk_band")),
+                    1 if ev.get("band_change_confirmed") else 0,
+                    _str_val(ev["evidence_quality"]),
+                    _str_val(ev["action_type"]),
+                    _str_val(ev["rule_applied"]),
+                    str(ev["explanation"]),
+                    _format_datetime(ev.get("created_at")),
                 ),
             )
             conn.commit()
@@ -446,8 +469,9 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 return _parse_date(row["last_date"])
             return None
 
-    def save_notice(self, notice: Dict[str, Any]) -> None:
+    def save_notice(self, notice: Union[Dict[str, Any], Any]) -> None:
         """Registra un aviso programado, aprobado o rechazado."""
+        not_dict = _to_dict(notice)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -459,19 +483,19 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    notice["notice_id"],
-                    notice["account_id"],
-                    notice.get("evaluation_id"),
-                    notice.get("channel", "EMAIL"),
-                    _format_date(notice["scheduled_date"]),
-                    notice.get("scheduled_time", "10:00:00"),
-                    str(notice["tone"]),
-                    notice["subject"],
-                    notice["body_text"],
-                    notice.get("validation_status", "PASSED"),
-                    notice.get("status", "SCHEDULED"),
-                    notice.get("rejection_reason"),
-                    _format_datetime(notice.get("sent_at")) if notice.get("sent_at") else None,
+                    not_dict["notice_id"],
+                    not_dict["account_id"],
+                    not_dict.get("evaluation_id"),
+                    not_dict.get("channel", "EMAIL"),
+                    _format_date(not_dict["scheduled_date"]),
+                    not_dict.get("scheduled_time", "10:00:00"),
+                    _str_val(not_dict["tone"]),
+                    not_dict["subject"],
+                    not_dict["body_text"],
+                    not_dict.get("validation_status", "PASSED"),
+                    _str_val(not_dict.get("status", "SCHEDULED")),
+                    not_dict.get("rejection_reason"),
+                    _format_datetime(not_dict.get("sent_at")) if not_dict.get("sent_at") else None,
                 ),
             )
             conn.commit()
@@ -479,21 +503,29 @@ class SQLitePortfolioRepository(PortfolioRepository):
     def update_payment_record(self, account_id: str, payment_date: date, amount: float, actor: str) -> None:
         """
         Permite al analista registrar o corregir un pago desde la cola de revisión.
-        Actualiza el saldo de la cuenta, liquida pagos pendientes y registra la pista de auditoría.
+        Actualiza el saldo de la cuenta, liquida pagos pendientes, actualiza el registro
+        del período más reciente y registra la pista de auditoría inmutable.
         """
         pay_str = _format_date(payment_date)
         with self._get_connection() as conn:
             cursor = conn.cursor()
 
             # 1. Obtener saldo actual
-            cursor.execute("SELECT current_balance, status FROM accounts WHERE account_id = ?;", (account_id,))
+            cursor.execute("SELECT current_balance, due_date, status FROM accounts WHERE account_id = ?;", (account_id,))
             account = cursor.fetchone()
             if not account:
                 raise ValueError(f"No existe la cuenta con account_id: {account_id}")
 
             current_balance = float(account["current_balance"])
+            due_dt = _parse_date(account["due_date"])
             new_balance = max(0.0, current_balance - amount)
-            new_status = "PAID" if new_balance == 0.0 else "PENDING_PAYMENT"
+            
+            if new_balance == 0.0:
+                new_status = "PAID"
+            elif due_dt and payment_date > due_dt:
+                new_status = "OVERDUE"
+            else:
+                new_status = "PENDING_PAYMENT"
 
             cursor.execute(
                 """
@@ -504,7 +536,7 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 (new_balance, new_status, account_id),
             )
 
-            # 2. Si existía un pago pendiente, marcarlo CLEARED
+            # 2. Si existía un pago pendiente en trámite, marcarlo CLEARED
             cursor.execute(
                 """
                 UPDATE pending_payments
@@ -514,7 +546,24 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 (account_id, pay_str),
             )
 
-            # 3. Registrar en pista de auditoría inmutable
+            # 3. Actualizar el período más reciente para reflejar el abono
+            cursor.execute(
+                """
+                UPDATE period_records
+                SET paid_amount = paid_amount + ?,
+                    actual_payment_date = ?,
+                    recorded_payment_date = ?
+                WHERE record_id = (
+                    SELECT record_id FROM period_records
+                    WHERE account_id = ?
+                    ORDER BY period_index DESC
+                    LIMIT 1
+                );
+                """,
+                (amount, pay_str, pay_str, account_id),
+            )
+
+            # 4. Registrar en pista de auditoría inmutable (Principio VII)
             log_id = f"LOG-{uuid.uuid4().hex[:12].upper()}"
             payload_json = json.dumps({
                 "account_id": account_id,
@@ -536,7 +585,11 @@ class SQLitePortfolioRepository(PortfolioRepository):
             conn.commit()
 
     def get_review_queue(self) -> List[Dict[str, Any]]:
-        """Retorna los casos pendientes de revisión humana ordenados por días al vencimiento."""
+        """
+        Retorna los casos pendientes de revisión humana.
+        Ordenados prioritariamente por urgencia (días al vencimiento ASC)
+        y nivel de riesgo (CRITICA > ALTA > MODERADA > BAJA).
+        """
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -546,7 +599,14 @@ class SQLitePortfolioRepository(PortfolioRepository):
                        corrected_data, resolved_by, resolved_at, created_at
                 FROM review_queue
                 WHERE status = 'PENDING'
-                ORDER BY days_to_due ASC, created_at ASC;
+                ORDER BY days_to_due ASC,
+                         CASE risk_band
+                             WHEN 'CRITICA' THEN 1
+                             WHEN 'ALTA' THEN 2
+                             WHEN 'MODERADA' THEN 3
+                             ELSE 4
+                         END ASC,
+                         created_at ASC;
                 """
             )
             rows = cursor.fetchall()
@@ -617,9 +677,9 @@ class SQLitePortfolioRepository(PortfolioRepository):
     # Métodos Auxiliares de Persistencia y Consulta para Apoyo a Otros Módulos
     # =========================================================================
 
-    def save_customer(self, customer: Union[Dict[str, Any], CustomerDTO]) -> None:
+    def save_customer(self, customer: Union[Dict[str, Any], Any]) -> None:
         """Inserta o actualiza un cliente."""
-        c = customer if isinstance(customer, dict) else customer.model_dump()
+        c = _to_dict(customer)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -632,14 +692,14 @@ class SQLitePortfolioRepository(PortfolioRepository):
                     c["full_name"],
                     c["email"],
                     1 if c.get("contact_enabled", True) else 0,
-                    _format_date(c.get("created_at", date.today())),
+                    _format_date(c.get("created_at") or date.today()),
                 ),
             )
             conn.commit()
 
-    def save_account(self, account: Union[Dict[str, Any], AccountDTO]) -> None:
+    def save_account(self, account: Union[Dict[str, Any], Any]) -> None:
         """Inserta o actualiza una cuenta."""
-        a = account if isinstance(account, dict) else account.model_dump()
+        a = _to_dict(account)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -656,14 +716,14 @@ class SQLitePortfolioRepository(PortfolioRepository):
                     float(a["current_balance"]),
                     float(a["minimum_payment"]),
                     _format_date(a["due_date"]),
-                    str(a.get("status", "UP_TO_DATE")),
+                    _str_val(a.get("status", "UP_TO_DATE")),
                 ),
             )
             conn.commit()
 
-    def save_period_record(self, record: Union[Dict[str, Any], PeriodRecordDTO]) -> None:
+    def save_period_record(self, record: Union[Dict[str, Any], Any]) -> None:
         """Inserta o actualiza un registro histórico de período."""
-        r = record if isinstance(record, dict) else record.model_dump()
+        r = _to_dict(record)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -690,9 +750,9 @@ class SQLitePortfolioRepository(PortfolioRepository):
             )
             conn.commit()
 
-    def save_pending_payment(self, payment: Union[Dict[str, Any], PendingPaymentDTO]) -> None:
+    def save_pending_payment(self, payment: Union[Dict[str, Any], Any]) -> None:
         """Inserta o actualiza un pago pendiente."""
-        p = payment if isinstance(payment, dict) else payment.model_dump()
+        p = _to_dict(payment)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -710,9 +770,10 @@ class SQLitePortfolioRepository(PortfolioRepository):
             )
             conn.commit()
 
-    def save_review_case(self, case: Dict[str, Any]) -> None:
+    def save_review_case(self, case: Union[Dict[str, Any], Any]) -> None:
         """Inserta o actualiza un caso en la cola de revisión."""
-        c_data = case.get("corrected_data")
+        c = _to_dict(case)
+        c_data = c.get("corrected_data")
         if isinstance(c_data, dict):
             c_data = json.dumps(c_data)
         with self._get_connection() as conn:
@@ -726,25 +787,26 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    case["case_id"],
-                    case["account_id"],
-                    case.get("evaluation_id"),
-                    int(case["days_to_due"]),
-                    str(case["risk_band"]),
-                    case["reason"],
-                    case["agent_hypothesis"],
-                    case.get("status", "PENDING"),
+                    c["case_id"],
+                    c["account_id"],
+                    c.get("evaluation_id"),
+                    int(c["days_to_due"]),
+                    _str_val(c["risk_band"]),
+                    c["reason"],
+                    c["agent_hypothesis"],
+                    _str_val(c.get("status", "PENDING")),
                     c_data,
-                    case.get("resolved_by"),
-                    _format_datetime(case.get("resolved_at")) if case.get("resolved_at") else None,
-                    _format_datetime(case.get("created_at")),
+                    c.get("resolved_by"),
+                    _format_datetime(c.get("resolved_at")) if c.get("resolved_at") else None,
+                    _format_datetime(c.get("created_at")),
                 ),
             )
             conn.commit()
 
-    def save_audit_log(self, entry: Dict[str, Any]) -> None:
+    def save_audit_log(self, entry: Union[Dict[str, Any], Any]) -> None:
         """Inserta un registro en la pista de auditoría inmutable."""
-        payload = entry["payload"]
+        e = _to_dict(entry)
+        payload = e["payload"]
         if isinstance(payload, dict):
             payload = json.dumps(payload)
         with self._get_connection() as conn:
@@ -755,38 +817,38 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 VALUES (?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    entry["log_id"],
-                    entry["account_id"],
-                    _format_datetime(entry.get("timestamp")),
-                    entry["event_type"],
-                    entry["actor"],
+                    e["log_id"],
+                    e["account_id"],
+                    _format_datetime(e.get("timestamp")),
+                    e["event_type"],
+                    e["actor"],
                     payload,
                 ),
             )
             conn.commit()
 
-    def get_audit_logs(self, account_id: Optional[str] = None) -> List[Dict[str, Any]]:
-        """Recupera entradas de la pista de auditoría."""
+    def get_audit_logs(
+        self, account_id: Optional[str] = None, event_type: Optional[str] = None
+    ) -> List[Dict[str, Any]]:
+        """Recupera entradas de la pista de auditoría con filtros opcionales."""
         with self._get_connection() as conn:
             cursor = conn.cursor()
+            query = "SELECT log_id, account_id, timestamp, event_type, actor, payload FROM audit_logs"
+            params: List[Any] = []
+            conditions: List[str] = []
+
             if account_id:
-                cursor.execute(
-                    """
-                    SELECT log_id, account_id, timestamp, event_type, actor, payload
-                    FROM audit_logs
-                    WHERE account_id = ?
-                    ORDER BY timestamp DESC;
-                    """,
-                    (account_id,),
-                )
-            else:
-                cursor.execute(
-                    """
-                    SELECT log_id, account_id, timestamp, event_type, actor, payload
-                    FROM audit_logs
-                    ORDER BY timestamp DESC;
-                    """
-                )
+                conditions.append("account_id = ?")
+                params.append(account_id)
+            if event_type:
+                conditions.append("event_type = ?")
+                params.append(event_type)
+
+            if conditions:
+                query += " WHERE " + " AND ".join(conditions)
+
+            query += " ORDER BY timestamp DESC;"
+            cursor.execute(query, tuple(params))
             rows = cursor.fetchall()
             logs = []
             for r in rows:
@@ -805,8 +867,9 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 })
             return logs
 
-    def save_captured_email(self, email_data: Dict[str, Any]) -> None:
+    def save_captured_email(self, email_data: Union[Dict[str, Any], Any]) -> None:
         """Guarda un correo capturado físicamente en el servidor SMTP local."""
+        em = _to_dict(email_data)
         with self._get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute(
@@ -815,12 +878,12 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 VALUES (?, ?, ?, ?, ?, ?);
                 """,
                 (
-                    email_data["email_id"],
-                    email_data["sender"],
-                    email_data["recipient"],
-                    email_data["subject"],
-                    email_data["raw_content"],
-                    _format_datetime(email_data.get("captured_at")),
+                    em["email_id"],
+                    em["sender"],
+                    em["recipient"],
+                    em["subject"],
+                    em["raw_content"],
+                    _format_datetime(em.get("captured_at")),
                 ),
             )
             conn.commit()
@@ -875,4 +938,17 @@ class SQLitePortfolioRepository(PortfolioRepository):
                 )
             else:
                 cursor.execute("SELECT * FROM contact_notices ORDER BY scheduled_date ASC;")
+            return [dict(r) for r in cursor.fetchall()]
+
+    def get_evaluations(self, account_id: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Obtiene las evaluaciones de riesgo registradas."""
+        with self._get_connection() as conn:
+            cursor = conn.cursor()
+            if account_id:
+                cursor.execute(
+                    "SELECT * FROM risk_evaluations WHERE account_id = ? ORDER BY evaluation_date DESC;",
+                    (account_id,),
+                )
+            else:
+                cursor.execute("SELECT * FROM risk_evaluations ORDER BY evaluation_date DESC;")
             return [dict(r) for r in cursor.fetchall()]
