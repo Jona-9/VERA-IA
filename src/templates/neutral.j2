@@ -1,0 +1,12 @@
+{#- Tono NEUTRAL: recordatorio informativo estándar. También es la plantilla de contingencia
+    cuando ToneGuard rechaza un borrador. Variables: ver DeterministicMessageDrafter. -#}
+{% set subject = "Recordatorio de pago - " ~ institution_name %}
+Estimado(a) {{ customer_name }}:
+
+Le escribimos de {{ institution_name }} para recordarle que su cuota por {{ amount_due | money }} {{ due_phrase }} ({{ due_date_str }}).
+
+Si ya realizó el pago, por favor ignore este mensaje y gracias por su puntualidad. Si tiene alguna consulta o necesita información sobre sus alternativas de pago, puede responder a este correo y con gusto le atenderemos.
+
+Atentamente,
+Equipo de Atención al Cliente
+{{ institution_name }}

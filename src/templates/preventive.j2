@@ -1,0 +1,13 @@
+{#- Tono PREVENTIVE: aviso cordial previo al vencimiento. Sin apremios (Constitución, buen trato). -#}
+{% set subject = "Su próxima cuota con " ~ institution_name %}
+Estimado(a) {{ customer_name }}:
+
+Queremos acompañarle en la organización de sus pagos. Le recordamos que su próxima cuota por {{ amount_due | money }} {{ due_phrase }} ({{ due_date_str }}).
+
+Pagar a tiempo le ayuda a mantener sus productos al día y sin cargos adicionales. Si prevé alguna dificultad para cubrir este monto, le invitamos a contactarnos antes de la fecha de vencimiento: podemos revisar juntos las alternativas disponibles.
+
+Si ya realizó el pago, le agradecemos y puede ignorar este mensaje.
+
+Atentamente,
+Equipo de Atención al Cliente
+{{ institution_name }}
