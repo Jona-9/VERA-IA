@@ -21,6 +21,14 @@ from src.domain.entities import (
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 POLICY_PATH = PROJECT_ROOT / "config" / "politica.yaml"
 
+@pytest.fixture(autouse=True)
+def disable_external_llm_calls_in_tests(monkeypatch):
+    """Evita llamadas de red lentas a APIs externas de LLM durante las pruebas automatizadas."""
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+
+
 @pytest.fixture
 def policy_config() -> PolicyConfig:
     """Política real cargada desde `config/politica.yaml` (rutas resueltas, no depende del cwd)."""

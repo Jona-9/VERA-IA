@@ -34,6 +34,8 @@ htmlcov/
 # Local databases & logs
 *.db
 *.sqlite3
+*.csv
+data/*.csv
 !data/.gitkeep
 !reports/.gitkeep
 
@@ -43,3 +45,7 @@ htmlcov/
 # Frontend
 node_modules/
 frontend/node_modules/
+
+# Environment secrets
+.env
+.env.local

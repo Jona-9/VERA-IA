@@ -157,6 +157,20 @@ def main() -> None:
         help="Salida reporte de métricas.",
     )
     parser.add_argument("--output-model", type=str, default="reports/risk_model.joblib", help="Salida modelo.")
+    parser.add_argument(
+        "--loan-dataset",
+        "--csv",
+        dest="loan_dataset",
+        type=str,
+        default=None,
+        help="Ruta a Loan_default.csv o archivo ZIP para entrenar con datos reales empíricos.",
+    )
+    parser.add_argument(
+        "--dataset-samples",
+        type=int,
+        default=2500,
+        help="Número de muestras a cargar desde el dataset empírico para entrenamiento.",
+    )
     parser.add_argument("--random-state", type=int, default=42, help="Semilla para reproducibilidad.")
     args = parser.parse_args()
 
@@ -168,8 +182,14 @@ def main() -> None:
     print(f"[*] Fecha de corte (Cutoff Date): {cutoff_d}")
     print(f"[*] Semilla determinista: {args.random_state}")
 
-    # Cargar datos desde SQLite si existe, o generar conjunto sintético reproducible
-    if os.path.exists(args.db):
+    # Prioridad: 1. Dataset empírico si se especifica, 2. SQLite existente, 3. Dataset sintético
+    if args.loan_dataset:
+        print(f"[*] Cargando dataset empírico de préstamos desde {args.loan_dataset}...")
+        from src.data.loan_default_adapter import load_raw_loan_dataset, extract_features_and_targets_from_loans
+        raw_df = load_raw_loan_dataset(source_path=args.loan_dataset, sample_size=args.dataset_samples, random_state=args.random_state)
+        X, y = extract_features_and_targets_from_loans(raw_df, cutoff_date=cutoff_d, seed=args.random_state)
+        print(f"[+] Señales extraídas del dataset empírico: {len(X)} registros (Tasa default: {y.mean():.2%}).")
+    elif os.path.exists(args.db):
         print(f"[*] Base de datos encontrada en {args.db}. Extrayendo señales...")
         try:
             X, y = load_from_sqlite(args.db, cutoff_d)

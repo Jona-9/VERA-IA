@@ -670,6 +670,92 @@ def calculate_benchmark() -> Dict[str, Any]:
 
 
 # ---------------------------------------------------------------------------
+# Loan Default Dataset & Prediction Endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/api/dataset/loan-default/sample")
+def get_loan_default_sample(limit: int = 20) -> Dict[str, Any]:
+    from src.data.loan_default_adapter import (
+        find_loan_dataset,
+        load_raw_loan_dataset,
+        convert_loan_to_portfolio_entities,
+    )
+    from src.policy.engine import classify_risk_band
+    from src.analytics.signals import compute_signals_for_account
+    from src.domain.entities import Account, PeriodRecord
+
+    ctx = _get_ctx()
+    try:
+        dataset_path = find_loan_dataset()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    df = load_raw_loan_dataset(source_path=str(dataset_path), sample_size=limit, random_state=42)
+    results = []
+    for _, row in df.iterrows():
+        cust, acc_dto, rec_dtos, _ = convert_loan_to_portfolio_entities(
+            loan_row=row,
+            cutoff_date=ctx.engine.current_date,
+        )
+        acc = Account(**acc_dto.model_dump())
+        records = [PeriodRecord(**r.model_dump()) for r in rec_dtos]
+        signals = compute_signals_for_account(acc, records, ctx.engine.current_date)
+        raw_p, calib_p = ctx.model.evaluate_signals(signals)
+        band = classify_risk_band(calib_p, ctx.policy)
+
+        results.append({
+            "loan_id": row["LoanID"],
+            "customer_name": cust.full_name,
+            "age": int(row["Age"]),
+            "income": float(row["Income"]),
+            "loan_amount": float(row["LoanAmount"]),
+            "credit_score": int(row["CreditScore"]),
+            "dti_ratio": float(row["DTIRatio"]),
+            "months_employed": int(row["MonthsEmployed"]),
+            "actual_default": int(row["Default"]),
+            "predicted_probability": round(calib_p, 4),
+            "predicted_probability_pct": f"{calib_p:.1%}",
+            "risk_band": band.value,
+        })
+
+    return {
+        "dataset": str(dataset_path.name),
+        "total_sample": len(results),
+        "items": results,
+    }
+
+
+@app.post("/api/dataset/loan-default/load-into-portfolio")
+def load_dataset_into_portfolio(num_accounts: int = 60) -> Dict[str, Any]:
+    from src.data.loan_default_adapter import (
+        find_loan_dataset,
+        populate_database_from_loans,
+    )
+
+    ctx = _get_ctx()
+    try:
+        dataset_path = find_loan_dataset()
+    except Exception as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
+    db_path = services.DEMO_DB_PATH
+    populate_database_from_loans(
+        db_path=str(db_path),
+        source_path=str(dataset_path),
+        num_accounts=num_accounts,
+        cutoff_date=ctx.engine.current_date,
+        seed=services.SEED,
+    )
+    # Re-ejecutar evaluación del ciclo actual
+    ctx.orchestrator.run_evaluation(ctx.engine.current_date)
+    return {
+        "success": True,
+        "message": f"Cartera actualizada exitosamente con {num_accounts} clientes reales desde {dataset_path.name}.",
+        "dataset": str(dataset_path.name),
+    }
+
+
+# ---------------------------------------------------------------------------
 # Static frontend delivery (Production)
 # ---------------------------------------------------------------------------
 
