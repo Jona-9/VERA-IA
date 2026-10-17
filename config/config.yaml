@@ -1,0 +1,23 @@
+# Configuración general del sistema y entorno
+# VERAIA - Agente de Cobranza Temprana
+
+environment: "local"
+
+database:
+  engine: "sqlite"
+  path: "data/portfolio_demo.db"
+
+smtp:
+  host: "127.0.0.1"
+  port: 1025
+  sender_email: "noreply@demo.veraia.local"
+  sender_name: "VERAIA Cobranza Preventiva"
+
+model:
+  random_state: 42
+  metrics_report_path: "reports/model_evaluation.json"
+
+simulation:
+  default_seed: 42
+  sample_customers_count: 120
+  months_history: 6

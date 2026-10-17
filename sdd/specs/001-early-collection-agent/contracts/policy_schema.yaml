@@ -1,0 +1,86 @@
+# Policy Configuration Schema & Default Values
+# Project: VERAIA Early Collection Agent
+# Implements: RF-08, RF-05, Clarification 2026-10-17
+
+version: "1.0.0"
+
+general_settings:
+  timezone: "America/Bogota"
+  human_review_cutoff_time: "09:00:00"
+  dispatch_window_time: "10:00:00"
+  payment_clearing_delay_days: 2
+  human_review_daily_capacity_ratio: 0.20
+  avoided_management_cost_ref: 1.0
+
+hysteresis_rules:
+  probability_margin: 0.05
+  cycles_to_confirm: 2
+
+evidence_rules:
+  min_period_history: 3
+  unreflected_payment_tolerance_days: 2
+
+bands:
+  BAJA:
+    probability_threshold: 0.15
+    preventive_contact:
+      allowed: false
+      window_days_before_due: []
+      max_notices: 0
+      min_separation_days: 0
+      allowed_tones: ["NEUTRAL"]
+    post_due_contact:
+      allowed: true
+      window_days_after_due: [2, 3, 4, 5]
+      max_notices: 1
+      min_separation_days: 0
+      allowed_tones: ["NEUTRAL"]
+
+  MODERADA:
+    probability_threshold: 0.40
+    preventive_contact:
+      allowed: true
+      window_days_before_due: [3, 2, 1]
+      max_notices: 1
+      min_separation_days: 0
+      allowed_tones: ["PREVENTIVE", "NEUTRAL"]
+    post_due_contact:
+      allowed: true
+      window_days_after_due: [1, 2, 3, 4, 5]
+      max_notices: 1
+      min_separation_days: 2
+      allowed_tones: ["NEUTRAL"]
+
+  ALTA:
+    probability_threshold: 0.70
+    preventive_contact:
+      allowed: true
+      window_days_before_due: [5, 4, 3, 2, 1]
+      max_notices: 2
+      min_separation_days: 2
+      allowed_tones: ["PREVENTIVE", "NEUTRAL"]
+    post_due_contact:
+      allowed: true
+      window_days_after_due: [1, 2, 3, 4, 5, 6, 7]
+      max_notices: 2
+      min_separation_days: 2
+      allowed_tones: ["FIRM", "NEUTRAL"]
+
+  CRITICA:
+    probability_threshold: 1.00
+    preventive_contact:
+      allowed: true
+      window_days_before_due: [7, 6, 5, 4, 3, 2, 1]
+      max_notices: 2
+      min_separation_days: 2
+      allowed_tones: ["PREVENTIVE", "NEUTRAL"]
+    post_due_contact:
+      allowed: true
+      window_days_after_due: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+      max_notices: 3
+      min_separation_days: 2
+      allowed_tones: ["FIRM"]
+
+multi_armed_bandit:
+  exploration_rate: 0.10
+  default_metric: "on_time_payment_rate"
