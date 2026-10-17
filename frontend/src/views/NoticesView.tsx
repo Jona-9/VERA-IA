@@ -145,7 +145,7 @@ export const NoticesView: React.FC<NoticesViewProps> = ({ onSelectClient }) => {
           {emails.length === 0 ? (
             <div className="card card-pad">
               <p className="muted">
-                La bandeja está vacía. Los correos aparecen aquí al enviar a las 10:00.
+                La bandeja está vacía. Los correos aparecen aquí al despachar los recordatorios.
               </p>
             </div>
           ) : (

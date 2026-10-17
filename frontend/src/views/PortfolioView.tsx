@@ -265,7 +265,7 @@ export const PortfolioView: React.FC<PortfolioViewProps> = ({
                 >
                   {probeResult.success ? (
                     <span>
-                      ✓ La política lo permite: aviso aprobado para las 10:00. {probeResult.message}
+                      ✓ La política lo permite: aviso aprobado para envío. {probeResult.message}
                     </span>
                   ) : (
                     <span>

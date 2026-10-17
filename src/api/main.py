@@ -181,7 +181,7 @@ def get_status() -> Dict[str, Any]:
     resolved_by_ai = max(0, total_accounts - review_count)
 
     header_note = f"{theme.day_label(engine.current_date)} · " + (
-        "revisión hoy" if in_review else "avisos enviados a las 10:00"
+        "revisión hoy" if in_review else "avisos enviados"
     )
     return {
         "day_number": engine.day_number,
@@ -235,13 +235,13 @@ def get_today_data() -> Dict[str, Any]:
     pct_str = f"{pct:.0%}"
 
     if not in_review:
-        headline = f"Día cerrado: {counts['enviados']} recordatorios enviados a las 10:00"
+        headline = f"Día cerrado: {counts['enviados']} recordatorios enviados"
         lead = "Pasa al día siguiente para ver las nuevas decisiones de la cartera."
         if n:
             lead = f"{n} caso{'s' if n != 1 else ''} sin revisar pasaron a la cola del siguiente día. " + lead
     elif n == 0:
         headline = f"Nada pendiente de revisión (0 de {total_accounts} clientes requieren revisión)"
-        lead = "El agente ya resolvió el 100% de la cartera y dejó listos los recordatorios de las 10:00."
+        lead = "El agente ya resolvió el 100% de la cartera y dejó listos los recordatorios para su envío."
     else:
         headline = f"{n} de {total_accounts} clientes requieren tu decisión hoy ({pct_str} de la cartera)"
         lead = (

@@ -27,7 +27,7 @@ EVIDENCE_LABEL = {"SUFFICIENT": "suficiente", "INSUFFICIENT": "insuficiente", "I
 TONE_LABEL = {"NEUTRAL": "Neutro", "PREVENTIVE": "Preventivo", "FIRM": "Firme"}
 NOTICE_LABEL = {
     "SCHEDULED": ("Programado", "t-soon"),
-    "APPROVED": ("Sale a las 10:00", "t-info"),
+    "APPROVED": ("Aprobado para envío", "t-info"),
     "REJECTED": ("No enviado", "t-urgent"),
     "DISPATCHED": ("Enviado", "t-ok"),
     "CAPTURED": ("Recibido en bandeja", "t-ok"),

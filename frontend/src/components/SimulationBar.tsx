@@ -59,7 +59,7 @@ export const SimulationBar: React.FC<SimulationBarProps> = ({ status, onUpdate }
             {loading
               ? 'Procesando…'
               : status.in_review
-              ? 'Cerrar revisión y enviar a las 10:00'
+              ? 'Cerrar revisión y enviar avisos'
               : 'Pasar al día siguiente'}
           </button>
 

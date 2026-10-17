@@ -122,8 +122,8 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate }) => {
         <div className="tiles">
           <Tile
             number={reminders}
-            title={in_review ? 'Recordatorios a las 10:00' : 'Recordatorios enviados a las 10:00'}
-            text={in_review ? 'Salen a las 10:00.' : 'Ya están en la bandeja de captura.'}
+            title={in_review ? 'Recordatorios para envío' : 'Recordatorios enviados'}
+            text={in_review ? 'Listos para ser enviados tras la revisión.' : 'Ya están en la bandeja de captura.'}
             onClick={() => onNavigate('notificaciones')}
           />
           <Tile
