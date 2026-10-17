@@ -14,6 +14,7 @@ from datetime import date
 from typing import Iterable, List, Optional
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 WEEKDAYS = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 MONTHS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
@@ -184,6 +185,30 @@ def tile(number: object, title: str, text: str, href: Optional[str] = None, mute
     if href:
         return f'<a class="card tile" href="{href}" target="_self">{body}</a>'
     return f'<div class="card tile">{body}</div>'
+
+
+SPA_LINKS_JS = """
+<script>
+const w = window.parent;
+if (!w.__veraSpaLinks) {
+  w.__veraSpaLinks = true;
+  w.document.addEventListener('click', (e) => {
+    const a = e.target.closest && e.target.closest('a[target="_self"]');
+    if (!a || e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    const href = a.getAttribute('href');
+    if (!href || !href.startsWith('/')) return;
+    e.preventDefault();
+    w.history.pushState({}, '', href);
+    w.dispatchEvent(new PopStateEvent('popstate', {state: {}}));
+  }, true);
+}
+</script>
+"""
+
+
+def enable_spa_links() -> None:
+    """Navega entre vistas sin recargar la página (evita el parpadeo de un enlace completo)."""
+    components.html(SPA_LINKS_JS, height=0)
 
 
 def spacer(px: int = 24) -> None:

@@ -20,6 +20,7 @@ from src.ui.views import benchmark_view, captured_inbox, portfolio, review_queue
 
 st.set_page_config(page_title="Cobranza temprana", page_icon="📈", layout="centered", initial_sidebar_state="collapsed")
 theme.inject_css()
+theme.enable_spa_links()
 
 pages = [
     st.Page(today.render, title="Hoy", url_path="", default=True),
