@@ -1,0 +1,59 @@
+{
+  "metrics": {
+    "roc_auc": 0.8769,
+    "brier_score": 0.0733
+  },
+  "sample_summary": {
+    "total_samples": 75,
+    "positives": 65,
+    "negatives": 10,
+    "positive_rate": 0.8667
+  },
+  "calibration_bins": [
+    {
+      "predicted_probability": 0.37132506939711896,
+      "empirical_fraction_positives": 0.0
+    },
+    {
+      "predicted_probability": 0.5058657764927541,
+      "empirical_fraction_positives": 0.4
+    },
+    {
+      "predicted_probability": 0.7349398887475601,
+      "empirical_fraction_positives": 0.7272727272727273
+    },
+    {
+      "predicted_probability": 0.9440616406066553,
+      "empirical_fraction_positives": 0.9649122807017544
+    }
+  ],
+  "criteria_verification": {
+    "roc_auc_threshold_met": true,
+    "brier_score_threshold_met": true,
+    "all_thresholds_satisfied": true
+  },
+  "training_metadata": {
+    "execution_timestamp": "2026-10-17T14:56:56.024639",
+    "cutoff_date": "2026-10-15",
+    "random_state": 42,
+    "features": [
+      "credit_utilization_ratio",
+      "consecutive_min_payments",
+      "payment_to_billed_ratio",
+      "payment_ratio_drop",
+      "historical_delinquency_rate",
+      "max_past_due_days",
+      "delinquency_trend"
+    ],
+    "coefficients": {
+      "credit_utilization_ratio": 0.803,
+      "consecutive_min_payments": 0.8145,
+      "payment_to_billed_ratio": -0.5208,
+      "payment_ratio_drop": 0.4842,
+      "historical_delinquency_rate": 0.9964,
+      "max_past_due_days": 0.3292,
+      "delinquency_trend": 0.507
+    },
+    "intercept": 2.5969
+  }
+}
