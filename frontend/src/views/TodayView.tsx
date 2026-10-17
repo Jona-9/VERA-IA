@@ -2,9 +2,8 @@ import React, { useEffect, useState } from 'react'
 import type { NavTab } from '../components/Navbar'
 import type { TodayData } from '../types'
 import { api } from '../api'
-import { Tag } from '../components/Tag'
+import { Tag, BandTag } from '../components/Tag'
 import { Tile } from '../components/Tile'
-import { CaseRow } from '../components/CaseRow'
 
 interface TodayViewProps {
   onNavigate: (tab: NavTab, params?: { caseId?: string; filter?: string }) => void
@@ -61,20 +60,43 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate }) => {
       </section>
 
       {n > 0 && (
-        <section className="card overflow-hidden">
+        <section className="card overflow-hidden divide-y divide-[#EFEFEB]">
           {cases.slice(0, MAX_CASES).map((c) => (
-            <CaseRow
+            <div
               key={c.case_id}
-              name={c.customer_name}
-              tag={
-                <Tag
-                  text={c.when_text}
-                  css={c.is_urgent ? 't-urgent' : 't-soon'}
-                />
-              }
-              summary={c.reason}
+              role="button"
+              tabIndex={0}
               onClick={() => onNavigate('por-revisar', { caseId: c.case_id })}
-            />
+              onKeyDown={(e) => e.key === 'Enter' && onNavigate('por-revisar', { caseId: c.case_id })}
+              className="p-5 flex flex-col gap-2 hover:bg-[#F7F7F4] transition-colors cursor-pointer"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <span className="font-semibold text-base text-[var(--ink)]">{c.customer_name}</span>
+                <div className="flex items-center gap-2">
+                  <Tag
+                    text={c.status_label || (c.is_carryover ? 'Arrastrado de ayer' : 'Pendiente hoy')}
+                    css={c.status_css || (c.is_carryover ? 't-urgent' : 't-soon')}
+                  />
+                  <Tag
+                    text={c.when_text}
+                    css={c.is_urgent ? 't-urgent' : 't-soon'}
+                  />
+                  <BandTag band={c.risk_band} />
+                </div>
+              </div>
+
+              {c.customer_context && (
+                <div className="text-xs text-[var(--muted)]">
+                  {c.customer_context}
+                </div>
+              )}
+
+              {c.why_manual_approval && (
+                <div className="text-xs text-[#7A2E06] bg-[#FDF5E6] border border-[#FBE6C6] p-2.5 rounded-lg leading-relaxed mt-1">
+                  <strong>Por qué requiere aprobación manual:</strong> {c.why_manual_approval}
+                </div>
+              )}
+            </div>
           ))}
 
           {n > MAX_CASES && (
@@ -96,7 +118,7 @@ export const TodayView: React.FC<TodayViewProps> = ({ onNavigate }) => {
       )}
 
       <section className="stack">
-        <h2 className="section-title">Lo hace el agente</h2>
+        <h2 className="section-title">Lo hace el agente autónomamente</h2>
         <div className="tiles">
           <Tile
             number={reminders}

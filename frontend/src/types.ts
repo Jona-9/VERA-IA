@@ -6,6 +6,8 @@ export interface SimulationStatus {
   in_review: boolean
   header_note: string
   review_count: number
+  total_portfolio?: number
+  resolved_by_ai?: number
   smtp_ok: boolean
 }
 
@@ -19,6 +21,13 @@ export interface ReviewCase {
   risk_band?: string
   reason: string
   agent_hypothesis?: string
+  customer_context?: string
+  why_manual_approval?: string
+  status_code?: 'PENDIENTE_HOY' | 'ARRAS_TRADO' | 'RESUELTO' | string
+  status_label?: string
+  status_css?: string
+  is_carryover?: boolean
+  opened_date?: string
   facts?: Array<{ k: string; v: string }>
   default_amount?: number
   default_date?: string
@@ -28,6 +37,9 @@ export interface TodayData {
   headline: string
   lead: string
   in_review: boolean
+  total_portfolio: number
+  review_count: number
+  resolved_by_ai_count: number
   cases: ReviewCase[]
   counts: {
     programados: number
@@ -182,4 +194,35 @@ export interface BenchmarkData {
       notices_while_payment_in_process: number
     }
   }
+}
+
+export interface DashboardData {
+  total_portfolio: number
+  resolved_by_ai: number
+  resolved_by_ai_pct: number
+  human_review_required: number
+  human_review_pct: number
+  cases_status: {
+    pending_total: number
+    pending_today: number
+    pending_carryover: number
+    resolved_count: number
+  }
+  pending_cases: ReviewCase[]
+  resolved_cases: Array<{
+    case_id: string
+    account_id: string
+    customer_name: string
+    reason: string
+    status: string
+    risk_band: string
+    resolved_by: string
+    resolved_at: string
+  }>
+  notices_counts: {
+    programados: number
+    enviados: number
+    retenidos: number
+  }
+  benchmark: BenchmarkData
 }

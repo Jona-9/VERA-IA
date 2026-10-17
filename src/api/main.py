@@ -99,6 +99,171 @@ def reset_demo() -> Dict[str, Any]:
 # Today View
 # ---------------------------------------------------------------------------
 
+def _get_why_manual_approval(c: Dict[str, Any], account: Any, pending: List[Any]) -> str:
+    case_id = c.get("case_id", "")
+    reason = c.get("reason", "")
+    if "PAYMENT_IN_PROCESS" in case_id or "Pago en proceso" in reason:
+        pending_strs = [
+            f"{theme.money(p.amount)} reportado el {p.payment_date.strftime('%d/%m')}"
+            for p in pending
+            if getattr(p, "status", "") == "IN_PROCESS"
+        ]
+        detail = f" ({', '.join(pending_strs)})" if pending_strs else ""
+        return (
+            f"El cliente presenta un pago en trámite{detail} no acreditado aún en el balance del banco. "
+            "La política VERAIA exige validación humana para evitar contactar a un cliente que ya pagó "
+            "o enviar un recordatorio indebido."
+        )
+    elif "OVER_LIMIT" in case_id or "supera el límite" in reason:
+        return (
+            "El saldo actual de la cuenta supera la línea de crédito autorizada. "
+            "La política exige autorización manual de un analista antes de iniciar acciones de cobranza estándar."
+        )
+    elif "NOTICES_EXHAUSTED" in case_id or "agotaron" in reason:
+        return (
+            "Se alcanzó el límite máximo de avisos automáticos permitidos por política sin registro de pago. "
+            "El caso debe ser derivado a gestión humana directa."
+        )
+    elif "UNEXPLAINED_PAYMENT" in case_id:
+        return (
+            "Existe una discrepancia no conciliada entre los comprobantes y el saldo de la cuenta. "
+            "Requiere revisión manual de auditoría."
+        )
+    return (
+        f"Requiere aprobación manual según política ({reason}). "
+        f"{c.get('agent_hypothesis', '')}"
+    ).strip()
+
+
+def _enrich_case(ctx: Any, c: Dict[str, Any]) -> Dict[str, Any]:
+    account = ctx.repo.get_account(c["account_id"])
+    customer = ctx.repo.get_customer(account.customer_id) if account else None
+    pending = ctx.repo.get_pending_payments(c["account_id"], ctx.engine.current_date)
+    notices = [n for n in ctx.repo.get_notices(c["account_id"]) if n["status"] in ("DISPATCHED", "CAPTURED")]
+
+    eval_id = c.get("evaluation_id", "")
+    opened_date = eval_id[3:13] if eval_id.startswith("EV-") else (c.get("created_at") or "")[:10]
+    sim_today = ctx.engine.current_date.isoformat()
+
+    is_carryover = bool(opened_date and opened_date < sim_today)
+    if is_carryover:
+        try:
+            d_diff = (ctx.engine.current_date - date.fromisoformat(opened_date[:10])).days
+            status_label = "Arrastrado de ayer" if d_diff == 1 else f"Arrastrado ({d_diff}d en cola)"
+        except Exception:
+            status_label = "Arrastrado de ayer"
+        status_code = "ARRAS_TRADO"
+        status_css = "t-urgent"
+    else:
+        status_label = "Pendiente hoy"
+        status_code = "PENDIENTE_HOY"
+        status_css = "t-soon"
+
+    customer_name = customer.full_name if customer else c["account_id"]
+    balance_str = theme.money(account.current_balance) if account else "—"
+    limit_str = theme.money(account.credit_limit) if account else "—"
+    util_str = f"{(account.current_balance / account.credit_limit):.0%}" if (account and account.credit_limit) else "—"
+    band_label = theme.BAND_LABEL.get(c.get("risk_band"), c.get("risk_band") or "—")
+
+    customer_context = f"Saldo: {balance_str} · Límite: {limit_str} ({util_str} uso) · {band_label}"
+    why_manual = _get_why_manual_approval(c, account, pending)
+
+    pending_text = "; ".join(
+        f"{theme.money(p.amount)} el {p.payment_date.strftime('%d/%m')} ({'en proceso' if p.status == 'IN_PROCESS' else p.status.lower()})"
+        for p in pending
+    ) or "Ninguno"
+
+    in_process_pending = [p for p in pending if p.status == "IN_PROCESS"]
+    default_amount = float(in_process_pending[0].amount) if in_process_pending else float(account.minimum_payment if account else 0.0)
+    default_date = in_process_pending[0].payment_date.isoformat() if in_process_pending else ctx.engine.current_date.isoformat()
+
+    facts = [
+        {"k": "Saldo", "v": balance_str},
+        {"k": "Pago mínimo", "v": theme.money(account.minimum_payment) if account else "—"},
+        {"k": "Vencimiento", "v": theme.when_text((account.due_date - ctx.engine.current_date).days if account else c["days_to_due"])},
+        {"k": "Pagos en trámite", "v": pending_text},
+        {"k": "Avisos enviados", "v": str(len(notices))},
+    ]
+
+    return {
+        "case_id": c["case_id"],
+        "account_id": c["account_id"],
+        "customer_name": customer_name,
+        "days_to_due": c["days_to_due"],
+        "when_text": theme.when_text(c["days_to_due"]),
+        "is_urgent": theme.is_urgent(c["days_to_due"]) or is_carryover,
+        "risk_band": c.get("risk_band"),
+        "reason": c["reason"],
+        "agent_hypothesis": c.get("agent_hypothesis", ""),
+        "customer_context": customer_context,
+        "why_manual_approval": why_manual,
+        "status_code": status_code,
+        "status_label": status_label,
+        "status_css": status_css,
+        "is_carryover": is_carryover,
+        "opened_date": opened_date,
+        "facts": facts,
+        "default_amount": default_amount,
+        "default_date": default_date,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Status & Simulation Controls
+# ---------------------------------------------------------------------------
+
+@app.get("/api/status")
+def get_status() -> Dict[str, Any]:
+    ctx = _get_ctx()
+    engine = ctx.engine
+    in_review = engine.phase == PHASE_REVIEW
+    review_queue = ctx.repo.get_review_queue()
+    accounts = ctx.repo.get_portfolio_accounts(engine.current_date)
+    total_accounts = len(accounts)
+    review_count = len(review_queue)
+    resolved_by_ai = max(0, total_accounts - review_count)
+
+    header_note = f"{theme.day_label(engine.current_date)} · " + (
+        "revisión hoy" if in_review else "avisos enviados a las 10:00"
+    )
+    return {
+        "day_number": engine.day_number,
+        "current_date": engine.current_date.isoformat(),
+        "date_label": theme.day_label(engine.current_date),
+        "phase": engine.phase,
+        "in_review": in_review,
+        "header_note": header_note,
+        "review_count": review_count,
+        "total_portfolio": total_accounts,
+        "resolved_by_ai": resolved_by_ai,
+        "smtp_ok": ctx.smtp_ok,
+    }
+
+
+@app.post("/api/simulation/close-day")
+def close_day() -> Dict[str, Any]:
+    ctx = _get_ctx()
+    ctx.engine.close_day()
+    return get_status()
+
+
+@app.post("/api/simulation/advance-day")
+def advance_day() -> Dict[str, Any]:
+    ctx = _get_ctx()
+    ctx.engine.advance_day()
+    return get_status()
+
+
+@app.post("/api/simulation/reset")
+def reset_demo() -> Dict[str, Any]:
+    services.reset_demo()
+    return get_status()
+
+
+# ---------------------------------------------------------------------------
+# Today View
+# ---------------------------------------------------------------------------
+
 @app.get("/api/today")
 def get_today_data() -> Dict[str, Any]:
     ctx = _get_ctx()
@@ -107,32 +272,27 @@ def get_today_data() -> Dict[str, Any]:
     counts = services.todays_notice_counts(ctx)
     in_review = ctx.engine.phase == PHASE_REVIEW
 
+    total_accounts = len(frame) if not frame.empty else 60
     n = len(cases)
-    if not in_review:
-        headline = "Día cerrado: " + (
-            f"{counts['enviados']} recordatorios enviados" if counts["enviados"] != 1 else "1 recordatorio enviado"
-        )
-        lead = "Pasa al día siguiente para ver las nuevas decisiones."
-        if n:
-            lead = f"{n} caso{'s' if n != 1 else ''} sin revisar se quedó sin enviar hoy. " + lead
-    elif n == 0:
-        headline, lead = "Nada pendiente de revisión", "El agente ya dejó listos los recordatorios de las 10:00."
-    else:
-        headline = f"{n} {'decisión' if n == 1 else 'decisiones'} para antes de las 09:00"
-        lead = "Lo que no revises a tiempo no se envía hoy."
+    pct = (n / total_accounts) if total_accounts > 0 else 0.0
+    pct_str = f"{pct:.0%}"
 
-    formatted_cases = []
-    for c in cases:
-        formatted_cases.append({
-            "case_id": c["case_id"],
-            "account_id": c["account_id"],
-            "customer_name": c["customer_name"],
-            "days_to_due": c["days_to_due"],
-            "when_text": theme.when_text(c["days_to_due"]),
-            "is_urgent": theme.is_urgent(c["days_to_due"]),
-            "reason": c["reason"],
-            "risk_band": c.get("risk_band"),
-        })
+    if not in_review:
+        headline = f"Día cerrado: {counts['enviados']} recordatorios enviados a las 10:00"
+        lead = "Pasa al día siguiente para ver las nuevas decisiones de la cartera."
+        if n:
+            lead = f"{n} caso{'s' if n != 1 else ''} sin revisar pasaron a la cola del siguiente día. " + lead
+    elif n == 0:
+        headline = f"Nada pendiente de revisión (0 de {total_accounts} clientes requieren revisión)"
+        lead = "El agente ya resolvió el 100% de la cartera y dejó listos los recordatorios de las 10:00."
+    else:
+        headline = f"{n} de {total_accounts} clientes requieren tu decisión hoy ({pct_str} de la cartera)"
+        lead = (
+            f"El {100 - int(round(pct * 100))}% restante fue resuelto de forma 100% autónoma por el agente. "
+            "Los casos no revisados hoy quedan retenidos y pasan a la cola del siguiente día."
+        )
+
+    formatted_cases = [_enrich_case(ctx, c) for c in cases]
 
     early = int(frame["Señal temprana"].sum()) if not frame.empty else 0
     reminders = counts["programados"] + counts["enviados"]
@@ -142,6 +302,9 @@ def get_today_data() -> Dict[str, Any]:
         "headline": headline,
         "lead": lead,
         "in_review": in_review,
+        "total_portfolio": total_accounts,
+        "review_count": n,
+        "resolved_by_ai_count": max(0, total_accounts - n),
         "cases": formatted_cases,
         "counts": counts,
         "early_signals": early,
@@ -158,43 +321,77 @@ def get_today_data() -> Dict[str, Any]:
 def get_review_queue() -> List[Dict[str, Any]]:
     ctx = _get_ctx()
     cases = services.review_cases(ctx)
-    out = []
-    for c in cases:
-        account = ctx.repo.get_account(c["account_id"])
-        pending = ctx.repo.get_pending_payments(account.account_id, ctx.engine.current_date)
-        notices = [n for n in ctx.repo.get_notices(account.account_id) if n["status"] in ("DISPATCHED", "CAPTURED")]
-        pending_text = "; ".join(
-            f"{theme.money(p.amount)} el {p.payment_date.strftime('%d/%m')} ({'en proceso' if p.status == 'IN_PROCESS' else p.status.lower()})"
-            for p in pending
-        ) or "Ninguno"
+    return [_enrich_case(ctx, c) for c in cases]
 
-        in_process_pending = [p for p in pending if p.status == "IN_PROCESS"]
-        default_amount = float(in_process_pending[0].amount) if in_process_pending else float(account.minimum_payment)
-        default_date = in_process_pending[0].payment_date.isoformat() if in_process_pending else ctx.engine.current_date.isoformat()
 
-        facts = [
-            {"k": "Saldo", "v": theme.money(account.current_balance)},
-            {"k": "Pago mínimo", "v": theme.money(account.minimum_payment)},
-            {"k": "Vencimiento", "v": theme.when_text((account.due_date - ctx.engine.current_date).days)},
-            {"k": "Pagos en trámite", "v": pending_text},
-            {"k": "Avisos enviados", "v": str(len(notices))},
-        ]
+# ---------------------------------------------------------------------------
+# Dashboard
+# ---------------------------------------------------------------------------
 
-        out.append({
-            "case_id": c["case_id"],
-            "account_id": c["account_id"],
-            "customer_name": c["customer_name"],
-            "days_to_due": c["days_to_due"],
-            "when_text": theme.when_text(c["days_to_due"]),
-            "is_urgent": theme.is_urgent(c["days_to_due"]),
-            "risk_band": c.get("risk_band"),
-            "reason": c["reason"],
-            "agent_hypothesis": c.get("agent_hypothesis", ""),
-            "facts": facts,
-            "default_amount": default_amount,
-            "default_date": default_date,
-        })
-    return out
+@app.get("/api/dashboard")
+def get_dashboard() -> Dict[str, Any]:
+    ctx = _get_ctx()
+    day = ctx.engine.current_date
+    accounts = ctx.repo.get_portfolio_accounts(day)
+    total_accounts = len(accounts)
+
+    review_cases_list = services.review_cases(ctx)
+    enriched_cases = [_enrich_case(ctx, c) for c in review_cases_list]
+
+    pending_today = [c for c in enriched_cases if not c["is_carryover"]]
+    pending_carryover = [c for c in enriched_cases if c["is_carryover"]]
+
+    resolved_cases = []
+    with ctx.repo._get_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT case_id, account_id, days_to_due, risk_band, reason, status, resolved_by, resolved_at, created_at
+            FROM review_queue
+            WHERE status != 'PENDING'
+            ORDER BY resolved_at DESC
+            LIMIT 15
+            """
+        )
+        for r in cursor.fetchall():
+            acc = ctx.repo.get_account(r["account_id"])
+            cust = ctx.repo.get_customer(acc.customer_id) if acc else None
+            resolved_cases.append({
+                "case_id": r["case_id"],
+                "account_id": r["account_id"],
+                "customer_name": cust.full_name if cust else r["account_id"],
+                "reason": r["reason"],
+                "status": r["status"],
+                "risk_band": r["risk_band"],
+                "resolved_by": r["resolved_by"] or "analista",
+                "resolved_at": (r["resolved_at"] or "")[:16].replace("T", " "),
+            })
+
+    total_pending = len(enriched_cases)
+    resolved_by_ai = max(0, total_accounts - total_pending)
+    resolved_by_ai_pct = round((resolved_by_ai / total_accounts * 100), 1) if total_accounts else 0
+    human_review_pct = round((total_pending / total_accounts * 100), 1) if total_accounts else 0
+
+    notice_counts = services.todays_notice_counts(ctx)
+    benchmark_info = get_benchmark()
+
+    return {
+        "total_portfolio": total_accounts,
+        "resolved_by_ai": resolved_by_ai,
+        "resolved_by_ai_pct": resolved_by_ai_pct,
+        "human_review_required": total_pending,
+        "human_review_pct": human_review_pct,
+        "cases_status": {
+            "pending_total": total_pending,
+            "pending_today": len(pending_today),
+            "pending_carryover": len(pending_carryover),
+            "resolved_count": len(resolved_cases),
+        },
+        "pending_cases": enriched_cases,
+        "resolved_cases": resolved_cases,
+        "notices_counts": notice_counts,
+        "benchmark": benchmark_info,
+    }
 
 
 class ReevaluateInput(BaseModel):

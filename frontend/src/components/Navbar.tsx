@@ -1,7 +1,7 @@
 import React from 'react'
 import type { SimulationStatus } from '../types'
 
-export type NavTab = 'hoy' | 'por-revisar' | 'notificaciones' | 'clientes' | 'efectividad'
+export type NavTab = 'hoy' | 'por-revisar' | 'notificaciones' | 'clientes' | 'dashboard'
 
 interface NavbarProps {
   currentTab: NavTab
@@ -15,7 +15,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, status 
     { id: 'por-revisar', label: 'Por revisar', badge: status?.review_count || 0 },
     { id: 'notificaciones', label: 'Notificaciones' },
     { id: 'clientes', label: 'Clientes' },
-    { id: 'efectividad', label: 'Efectividad' },
+    { id: 'dashboard', label: 'Dashboard' },
   ]
 
   return (
@@ -40,7 +40,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentTab, onSelectTab, status 
               strokeLinejoin="round"
             ></path>
           </svg>
-          Cobranza temprana
+          VERA
         </a>
 
         <nav className="links" aria-label="Principal">

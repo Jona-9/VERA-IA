@@ -89,4 +89,6 @@ export const api = {
 
   getBenchmark: () => request<BenchmarkData>('/benchmark'),
   runBenchmark: () => request<BenchmarkData>('/benchmark/run', { method: 'POST' }),
+
+  getDashboard: () => request<import('./types').DashboardData>('/dashboard'),
 }

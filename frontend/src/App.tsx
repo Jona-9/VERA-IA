@@ -9,7 +9,7 @@ import { TodayView } from './views/TodayView'
 import { ReviewQueueView } from './views/ReviewQueueView'
 import { NoticesView } from './views/NoticesView'
 import { PortfolioView } from './views/PortfolioView'
-import { BenchmarkView } from './views/BenchmarkView'
+import { DashboardView } from './views/DashboardView'
 
 export function App() {
   const [currentTab, setCurrentTab] = useState<NavTab>('hoy')
@@ -92,7 +92,13 @@ export function App() {
             />
           )}
 
-          {currentTab === 'efectividad' && <BenchmarkView />}
+          {currentTab === 'dashboard' && (
+            <DashboardView
+              onNavigateToReview={(caseId) =>
+                handleNavigate('por-revisar', { caseId })
+              }
+            />
+          )}
         </div>
 
         <Footer />

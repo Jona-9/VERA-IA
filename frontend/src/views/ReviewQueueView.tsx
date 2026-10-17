@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react'
 import type { ReviewCase } from '../types'
 import { api } from '../api'
 import { Tag, BandTag } from '../components/Tag'
-import { CaseRow } from '../components/CaseRow'
 
 interface ReviewQueueViewProps {
   initialCaseId?: string
@@ -116,27 +115,44 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
 
       {cases.length === 0 ? (
         <div className="card card-pad mt-4">
-          <p className="muted">No hay casos pendientes.</p>
+          <p className="muted">No hay casos pendientes en la cola.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-12 gap-6 items-start mt-4">
           {/* Left Column: Queue */}
           <div className="md:col-span-5">
-            <section className="card overflow-hidden">
+            <section className="card overflow-hidden divide-y divide-[#EFEFEB]">
               {cases.map((c) => (
-                <CaseRow
+                <div
                   key={c.case_id}
-                  name={c.customer_name}
-                  tag={
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => handleSelectCase(c)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSelectCase(c)}
+                  className={`p-4 flex flex-col gap-1.5 cursor-pointer transition-colors ${
+                    c.case_id === selectedCaseId ? 'bg-[#F3F5FD]' : 'hover:bg-[#F7F7F4]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-semibold text-sm text-[var(--ink)]">{c.customer_name}</span>
+                    <Tag
+                      text={c.status_label || (c.is_carryover ? 'Arrastrado de ayer' : 'Pendiente hoy')}
+                      css={c.status_css || (c.is_carryover ? 't-urgent' : 't-soon')}
+                    />
+                  </div>
+
+                  <div className="flex items-center gap-2">
                     <Tag
                       text={c.when_text}
                       css={c.is_urgent ? 't-urgent' : 't-soon'}
                     />
-                  }
-                  summary={c.reason}
-                  selected={c.case_id === selectedCaseId}
-                  onClick={() => handleSelectCase(c)}
-                />
+                    <BandTag band={c.risk_band} />
+                  </div>
+
+                  <span className="text-xs text-[var(--muted)] line-clamp-1">
+                    {c.reason}
+                  </span>
+                </div>
               ))}
             </section>
           </div>
@@ -145,18 +161,37 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
           {selectedCase && (
             <div className="md:col-span-7 flex flex-col gap-4">
               <div className="card card-pad stack">
-                <h2 className="section-title text-xl">{selectedCase.customer_name}</h2>
-                <div className="flex items-center gap-2">
-                  <Tag
-                    text={selectedCase.when_text}
-                    css={selectedCase.is_urgent ? 't-urgent' : 't-soon'}
-                  />
-                  <BandTag band={selectedCase.risk_band} />
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h2 className="section-title text-xl">{selectedCase.customer_name}</h2>
+                  <div className="flex items-center gap-2">
+                    <Tag
+                      text={selectedCase.status_label || (selectedCase.is_carryover ? 'Arrastrado de ayer' : 'Pendiente hoy')}
+                      css={selectedCase.status_css || (selectedCase.is_carryover ? 't-urgent' : 't-soon')}
+                    />
+                    <Tag
+                      text={selectedCase.when_text}
+                      css={selectedCase.is_urgent ? 't-urgent' : 't-soon'}
+                    />
+                    <BandTag band={selectedCase.risk_band} />
+                  </div>
                 </div>
-                <p className="font-semibold text-[15px]">{selectedCase.reason}</p>
+
+                {selectedCase.customer_context && (
+                  <p className="text-xs text-[var(--muted)] border-b border-[#ECECE8] pb-2">
+                    {selectedCase.customer_context}
+                  </p>
+                )}
+
+                {/* Por qué requiere aprobación manual */}
+                {selectedCase.why_manual_approval && (
+                  <div className="p-3 bg-[#FDF5E6] border border-[#FBE6C6] rounded-xl text-xs text-[#7A2E06] leading-relaxed">
+                    <strong>Por qué debe ser aprobado manualmente:</strong> {selectedCase.why_manual_approval}
+                  </div>
+                )}
+
                 {selectedCase.agent_hypothesis && (
-                  <p className="small muted">
-                    <strong>Lo que concluyó el agente:</strong> {selectedCase.agent_hypothesis}
+                  <p className="text-xs text-[var(--muted)]">
+                    <strong>Conclusión preliminar del agente:</strong> {selectedCase.agent_hypothesis}
                   </p>
                 )}
 
@@ -254,7 +289,7 @@ export const ReviewQueueView: React.FC<ReviewQueueViewProps> = ({
                     rows={2}
                     value={notes}
                     onChange={(e) => setNotes(e.target.value)}
-                    placeholder="Opcional. Queda en la auditoría."
+                    placeholder="Opcional. Queda en la bitácora de auditoría."
                     className="form-textarea"
                   />
                 </div>
