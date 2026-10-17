@@ -8,6 +8,8 @@ from typing import List, Tuple
 import pytest
 import numpy as np
 import pandas as pd
+from pathlib import Path
+from src.policy.config import PolicyConfig, load_policy_config
 
 from src.domain.entities import (
     Customer,
@@ -15,6 +17,14 @@ from src.domain.entities import (
     AccountStatus,
     PeriodRecord,
 )
+
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+POLICY_PATH = PROJECT_ROOT / "config" / "politica.yaml"
+
+@pytest.fixture
+def policy_config() -> PolicyConfig:
+    """Política real cargada desde `config/politica.yaml` (rutas resueltas, no depende del cwd)."""
+    return load_policy_config(POLICY_PATH)
 
 
 @pytest.fixture
